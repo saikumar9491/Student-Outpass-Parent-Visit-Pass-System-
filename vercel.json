@@ -1,7 +1,11 @@
 {
-  "version": 2,
+  "buildCommand": "cd client && npm install && npm run build",
+  "outputDirectory": "client/dist",
+  "framework": "vite",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/my-app/server/api/index.js" },
-    { "source": "/(.*)", "destination": "/my-app/server/api/index.js" }
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
