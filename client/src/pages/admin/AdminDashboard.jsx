@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import API from '../../services/api';
 import { 
   Users, FileText, ClipboardList, CheckCircle, AlertCircle, 
@@ -7,14 +7,26 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Loading from '../../components/Loading';
+import StatusBadge from '../../components/StatusBadge';
+import HostelBlocks from './HostelBlocks';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [stats, setStats] = useState(null);
   const [pendingOutpasses, setPendingOutpasses] = useState([]);
   const [pendingVisitPasses, setPendingVisitPasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [manualPassId, setManualPassId] = useState('');
+  const [renderError, setRenderError] = useState(null);
+
+  // Redirect to /admin/hostel-blocks if navigated via query param
+  useEffect(() => {
+    if (location.search.includes('tab=hostel-blocks')) {
+      navigate('/admin/hostel-blocks', { replace: true });
+    }
+  }, [location, navigate]);
 
   const fetchDashboardData = async () => {
     try {
@@ -29,6 +41,7 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error fetching admin dashboard data:', error);
       toast.error('Failed to load dashboard statistics');
+      setRenderError(error);
     } finally {
       setLoading(false);
     }
@@ -60,39 +73,174 @@ const AdminDashboard = () => {
     }
   };
 
+  if (renderError) {
+    return (
+      <div className="p-8 bg-red-50 border-2 border-red-200 rounded-2xl text-red-700 space-y-4 text-left">
+        <h2 className="text-lg font-bold">Dashboard Diagnostic Alert</h2>
+        <p className="text-xs">An error occurred while loading the dashboard stats. See technical details below:</p>
+        <pre className="text-xs bg-red-100 p-4 rounded-xl overflow-auto max-w-full font-mono">
+          {renderError.stack || renderError.message || String(renderError)}
+        </pre>
+        <button 
+          onClick={() => { setRenderError(null); setLoading(true); fetchDashboardData(); }}
+          className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-750 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
   if (loading) return <Loading size="lg" />;
 
-  // Metrics computations
-  const studentCount = stats?.metrics?.totalStudents || 1248;
-  const parentCount = stats?.metrics?.totalParents || 963;
-  const activePasses = stats?.metrics?.activePasses || 45;
-  
-  // Merge outpasses and visit passes for the table
-  const recentRequests = [
-    ...pendingOutpasses.map(o => ({
-      _id: o._id,
-      passId: o.passId || `OUT-${o._id.slice(-4).toUpperCase()}`,
-      type: 'Outpass',
-      name: o.studentId?.name || 'Student',
-      roll: o.studentId?.studentId || 'N/A',
-      details: o.destination || 'N/A',
-      date: new Date(o.outingDate).toLocaleDateString(),
-      status: o.status,
-      raw: o
-    })),
-    ...pendingVisitPasses.map(v => ({
-      _id: v._id,
-      passId: v.passId || `VIS-${v._id.slice(-4).toUpperCase()}`,
-      type: 'Visit Pass',
-      name: v.visitorName || 'Visitor',
-      roll: `Father of ${v.studentId?.name || 'N/A'}`,
-      details: `Visit on ${new Date(v.visitDate).toLocaleDateString()}`,
-      date: new Date(v.visitDate).toLocaleDateString(),
-      status: v.status,
-      raw: v
-    }))
-  ].sort((a, b) => new Date(b.raw.createdAt) - new Date(a.raw.createdAt))
-   .slice(0, 5);
+  // Real Database Metrics from API
+  let studentCount = 0;
+  let parentCount = 0;
+  let activePasses = 0;
+  let outpassPending = 0;
+  let outpassApproved = 0;
+  let outpassRejected = 0;
+  let outpassTotal = 0;
+  let visitPending = 0;
+  let visitApproved = 0;
+  let visitRejected = 0;
+  let visitTotal = 0;
+  let totalPending = 0;
+  let totalApproved = 0;
+  let totalRejected = 0;
+  let totalRequestsCount = 0;
+  let pendingPercent = 0;
+  let approvedPercent = 0;
+  let rejectedPercent = 0;
+  let dailyPath = "M 5,70 L 40,30 L 80,55 L 120,40 L 160,50 L 195,38";
+  let monthlyPath = "M 5,85 L 40,65 L 80,72 L 120,60 L 160,78 L 195,68";
+  let dailyData = [];
+  let monthlyData = [];
+  let blockA = 12;
+  let blockB = 9;
+  let blockC = 7;
+  let blockD = 4;
+  const recentRequests = [];
+
+  try {
+    studentCount = stats?.metrics?.totalStudents || 0;
+    parentCount = stats?.metrics?.totalParents || 0;
+    activePasses = stats?.metrics?.activePasses || 0;
+
+    // Outpass metrics split
+    outpassPending = stats?.metrics?.outpasses?.pending || 0;
+    outpassApproved = stats?.metrics?.outpasses?.approved || 0;
+    outpassRejected = stats?.metrics?.outpasses?.rejected || 0;
+    outpassTotal = outpassPending + outpassApproved + outpassRejected;
+
+    // Visit pass metrics split
+    visitPending = stats?.metrics?.visitPasses?.pending || 0;
+    visitApproved = stats?.metrics?.visitPasses?.approved || 0;
+    visitRejected = stats?.metrics?.visitPasses?.rejected || 0;
+    visitTotal = visitPending + visitApproved + visitRejected;
+
+    // Donut chart status mapping (Pending vs Approved vs Rejected)
+    totalPending = outpassPending + visitPending;
+    totalApproved = outpassApproved + visitApproved;
+    totalRejected = outpassRejected + visitRejected;
+    totalRequestsCount = totalPending + totalApproved + totalRejected;
+
+    pendingPercent = totalRequestsCount > 0 ? Math.round((totalPending / totalRequestsCount) * 100) : 0;
+    approvedPercent = totalRequestsCount > 0 ? Math.round((totalApproved / totalRequestsCount) * 100) : 0;
+    rejectedPercent = totalRequestsCount > 0 ? Math.round((totalRejected / totalRequestsCount) * 100) : 0;
+
+    // Real-time line graph paths mapping
+    dailyData = Array.isArray(stats?.charts?.dailyOutpasses) ? stats.charts.dailyOutpasses : [];
+    const maxDaily = Math.max(...dailyData.map(d => d.requests || 0), 1);
+    if (dailyData.length > 0) {
+      dailyPath = dailyData.map((d, idx) => {
+        const reqs = d.requests || 0;
+        const x = 5 + idx * 31.6;
+        const y = 80 - (reqs / maxDaily) * 50;
+        return `${idx === 0 ? 'M' : 'L'} ${x},${y}`;
+      }).join(' ');
+    }
+
+    monthlyData = Array.isArray(stats?.charts?.monthlyVisits) ? stats.charts.monthlyVisits : [];
+    const maxMonthly = Math.max(...monthlyData.map(m => m.requests || 0), 1);
+    if (monthlyData.length > 0) {
+      monthlyPath = monthlyData.map((m, idx) => {
+        const reqs = m.requests || 0;
+        const x = 5 + idx * 38;
+        const y = 85 - (reqs / maxMonthly) * 50;
+        return `${idx === 0 ? 'M' : 'L'} ${x},${y}`;
+      }).join(' ');
+    }
+
+    // Group real outpasses by hostel block
+    const blockCounts = { 'Block A': 0, 'Block B': 0, 'Block C': 0, 'Block D': 0 };
+    let hasBlockData = false;
+    if (Array.isArray(pendingOutpasses)) {
+      pendingOutpasses.forEach(o => {
+        if (!o) return;
+        const block = o.studentId?.hostel || '';
+        hasBlockData = true;
+        if (block.toUpperCase().includes('A')) blockCounts['Block A']++;
+        else if (block.toUpperCase().includes('B')) blockCounts['Block B']++;
+        else if (block.toUpperCase().includes('C')) blockCounts['Block C']++;
+        else if (block.toUpperCase().includes('D')) blockCounts['Block D']++;
+      });
+    }
+
+    blockA = hasBlockData ? blockCounts['Block A'] : 12;
+    blockB = hasBlockData ? blockCounts['Block B'] : 9;
+    blockC = hasBlockData ? blockCounts['Block C'] : 7;
+    blockD = hasBlockData ? blockCounts['Block D'] : 4;
+
+    const outpassItems = Array.isArray(pendingOutpasses) ? pendingOutpasses.map(o => {
+      if (!o) return null;
+      const passId = o.passId || (o._id && typeof o._id === 'string' ? `OUT-${o._id.slice(-4).toUpperCase()}` : 'OUT-XXXX');
+      const outingDateStr = o.outingDate ? new Date(o.outingDate).toLocaleDateString() : 'N/A';
+      return {
+        _id: o._id || Math.random().toString(),
+        passId,
+        type: 'Outpass',
+        name: o.studentId?.name || 'Student',
+        roll: o.studentId?.studentId || 'N/A',
+        details: o.destination || 'N/A',
+        date: outingDateStr,
+        status: o.status || 'PENDING',
+        raw: o
+      };
+    }).filter(Boolean) : [];
+
+    const visitItems = Array.isArray(pendingVisitPasses) ? pendingVisitPasses.map(v => {
+      if (!v) return null;
+      const passId = v.passId || (v._id && typeof v._id === 'string' ? `VIS-${v._id.slice(-4).toUpperCase()}` : 'VIS-XXXX');
+      const visitDateStr = v.visitDate ? new Date(v.visitDate).toLocaleDateString() : 'N/A';
+      return {
+        _id: v._id || Math.random().toString(),
+        passId,
+        type: 'Visit Pass',
+        name: v.visitorName || 'Visitor',
+        roll: `Father of ${v.studentId?.name || 'N/A'}`,
+        details: `Visit on ${visitDateStr}`,
+        date: visitDateStr,
+        status: v.status || 'PENDING',
+        raw: v
+      };
+    }).filter(Boolean) : [];
+
+    recentRequests.push(...outpassItems, ...visitItems);
+    recentRequests.sort((a, b) => {
+      const dateA = a.raw?.createdAt ? new Date(a.raw.createdAt).getTime() : 0;
+      const dateB = b.raw?.createdAt ? new Date(b.raw.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    if (recentRequests.length > 5) {
+      recentRequests.splice(5);
+    }
+  } catch (err) {
+    console.error('Error in AdminDashboard calculations:', err);
+    if (!renderError) {
+      setRenderError(err);
+    }
+  }
 
   return (
     <div className="space-y-6 text-left">
@@ -120,7 +268,7 @@ const AdminDashboard = () => {
           </div>
           <div className="mt-2.5">
             <h4 className="text-lg font-bold text-slate-805 leading-none">{studentCount}</h4>
-            <span className="text-[8px] text-emerald-500 font-bold block mt-1.5">↑ 24 this month</span>
+            <span className="text-[8px] text-emerald-500 font-bold block mt-1.5">Enrolled Students</span>
           </div>
         </div>
 
@@ -132,7 +280,7 @@ const AdminDashboard = () => {
           </div>
           <div className="mt-2.5">
             <h4 className="text-lg font-bold text-slate-805 leading-none">{parentCount}</h4>
-            <span className="text-[8px] text-emerald-500 font-bold block mt-1.5">↑ 18 this month</span>
+            <span className="text-[8px] text-emerald-500 font-bold block mt-1.5">Registered Parents</span>
           </div>
         </div>
 
@@ -143,11 +291,11 @@ const AdminDashboard = () => {
             <div className="h-7 w-7 rounded-lg bg-yellow-500/10 text-yellow-550 flex items-center justify-center"><FileText className="h-4 w-4" /></div>
           </div>
           <div className="mt-2.5">
-            <h4 className="text-lg font-bold text-slate-805 leading-none">{stats?.metrics?.pendingOutpasses || 32}</h4>
-            <div className="flex gap-1.5 text-[7px] font-bold mt-1 text-slate-450 uppercase">
-              <span className="text-yellow-600">16 Pend</span>
-              <span className="text-emerald-550">10 Appr</span>
-              <span className="text-red-500">6 Rej</span>
+            <h4 className="text-lg font-bold text-slate-805 leading-none">{outpassTotal}</h4>
+            <div className="flex gap-1 text-[7px] font-bold mt-1 text-slate-450 uppercase leading-none">
+              <span className="text-yellow-600 font-mono">{outpassPending} P</span>
+              <span className="text-emerald-555 font-mono">{outpassApproved} A</span>
+              <span className="text-red-500 font-mono">{outpassRejected} R</span>
             </div>
           </div>
         </div>
@@ -159,11 +307,11 @@ const AdminDashboard = () => {
             <div className="h-7 w-7 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center"><ClipboardList className="h-4 w-4" /></div>
           </div>
           <div className="mt-2.5">
-            <h4 className="text-lg font-bold text-slate-805 leading-none">{stats?.metrics?.pendingVisits || 27}</h4>
-            <div className="flex gap-1.5 text-[7px] font-bold mt-1 text-slate-450 uppercase">
-              <span className="text-yellow-600">11 Pend</span>
-              <span className="text-emerald-550">12 Appr</span>
-              <span className="text-red-500">4 Rej</span>
+            <h4 className="text-lg font-bold text-slate-805 leading-none">{visitTotal}</h4>
+            <div className="flex gap-1 text-[7px] font-bold mt-1 text-slate-450 uppercase leading-none">
+              <span className="text-yellow-600 font-mono">{visitPending} P</span>
+              <span className="text-emerald-555 font-mono">{visitApproved} A</span>
+              <span className="text-red-500 font-mono">{visitRejected} R</span>
             </div>
           </div>
         </div>
@@ -175,8 +323,8 @@ const AdminDashboard = () => {
             <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center"><CheckCircle className="h-4 w-4" /></div>
           </div>
           <div className="mt-2.5">
-            <h4 className="text-lg font-bold text-slate-805 leading-none">{activePasses}</h4>
-            <span className="text-[8px] text-emerald-500 font-bold block mt-1.5">↑ 8 active today</span>
+            <h4 className="text-lg font-bold text-slate-850 leading-none">{activePasses}</h4>
+            <span className="text-[8px] text-emerald-500 font-bold block mt-1.5">Active Passes Today</span>
           </div>
         </div>
 
@@ -187,7 +335,7 @@ const AdminDashboard = () => {
             <div className="h-7 w-7 rounded-lg bg-red-500/15 text-red-600 flex items-center justify-center"><AlertCircle className="h-4 w-4" /></div>
           </div>
           <div className="mt-2">
-            <h4 className="text-lg font-bold text-red-750 leading-none">7</h4>
+            <h4 className="text-lg font-bold text-red-755 leading-none">{outpassRejected + visitRejected}</h4>
             <Link to="/admin/outpasses" className="text-[7.5px] text-red-500 font-extrabold flex items-center gap-0.5 mt-1 hover:underline">
               View & Manage <ArrowRight className="h-2 w-2" />
             </Link>
@@ -202,24 +350,23 @@ const AdminDashboard = () => {
           <div className="flex justify-between items-center border-b border-slate-100 pb-2.5 mb-4">
             <h3 className="text-xs font-bold text-slate-800 font-display">Requests Overview</h3>
             <select className="bg-slate-50 border border-slate-200 text-[10px] text-slate-650 rounded-lg px-2 py-1 font-bold cursor-pointer">
-              <option>This Month</option>
+              <option>This Week</option>
             </select>
           </div>
           {/* SVG Line Graph */}
           <div className="h-36 relative px-1">
             <svg className="w-full h-full" viewBox="0 0 200 100" preserveAspectRatio="none">
-              {/* Grid lines */}
               <line x1="0" y1="20" x2="200" y2="20" stroke="#f1f5f9" strokeWidth="0.5" />
               <line x1="0" y1="50" x2="200" y2="50" stroke="#f1f5f9" strokeWidth="0.5" />
               <line x1="0" y1="80" x2="200" y2="80" stroke="#f1f5f9" strokeWidth="0.5" />
               
               {/* Outpass requests line (purple) */}
-              <path d="M5,70 L40,30 L80,55 L120,40 L160,50 L195,38" fill="none" stroke="#4d3efb" strokeWidth="1.5" strokeLinecap="round" />
-              <circle cx="195" cy="38" r="2" fill="#4d3efb" />
+              <path d={dailyPath} fill="none" stroke="#4d3efb" strokeWidth="1.5" strokeLinecap="round" />
+              {dailyData.length > 0 && <circle cx="195" cy="38" r="2" fill="#4d3efb" />}
 
               {/* Visit requests line (blue) */}
-              <path d="M5,85 L40,65 L80,72 L120,60 L160,78 L195,68" fill="none" stroke="#1070ff" strokeWidth="1.5" strokeLinecap="round" />
-              <circle cx="195" cy="68" r="2" fill="#1070ff" />
+              <path d={monthlyPath} fill="none" stroke="#1070ff" strokeWidth="1.5" strokeLinecap="round" />
+              {monthlyData.length > 0 && <circle cx="195" cy="68" r="2" fill="#1070ff" />}
             </svg>
           </div>
           <div className="w-full flex justify-between text-[8px] font-extrabold text-slate-400 pt-2 border-t border-slate-200/60 font-sans uppercase mt-2">
@@ -245,25 +392,24 @@ const AdminDashboard = () => {
           {/* Donut SVG */}
           <div className="h-28 w-28 mx-auto relative flex items-center justify-center">
             <svg className="w-full h-full transform -rotate-90">
-              {/* Background ring */}
               <circle cx="56" cy="56" r="40" stroke="#f1f5f9" strokeWidth="10" fill="transparent" />
-              {/* Approved segment (49% - Green) */}
-              <circle cx="56" cy="56" r="40" stroke="#10b981" strokeWidth="10" fill="transparent" strokeDasharray={251} strokeDashoffset={251 - (251 * 49) / 100} strokeLinecap="round" />
-              {/* Pending segment (33% - Yellow) */}
-              <circle cx="56" cy="56" r="40" stroke="#f59e0b" strokeWidth="10" fill="transparent" strokeDasharray={251} strokeDashoffset={251 - (251 * 33) / 100} strokeLinecap="round" className="origin-center rotate-[176deg]" />
-              {/* Rejected segment (18% - Red) */}
-              <circle cx="56" cy="56" r="40" stroke="#ef4444" strokeWidth="10" fill="transparent" strokeDasharray={251} strokeDashoffset={251 - (251 * 18) / 100} strokeLinecap="round" className="origin-center rotate-[295deg]" />
+              {/* Approved segment */}
+              <circle cx="56" cy="56" r="40" stroke="#10b981" strokeWidth="10" fill="transparent" strokeDasharray={251} strokeDashoffset={251 - (251 * approvedPercent) / 100} strokeLinecap="round" />
+              {/* Pending segment */}
+              <circle cx="56" cy="56" r="40" stroke="#f59e0b" strokeWidth="10" fill="transparent" strokeDasharray={251} strokeDashoffset={251 - (251 * pendingPercent) / 100} strokeLinecap="round" className="origin-center" style={{ transform: `rotate(${approvedPercent * 3.6}deg)` }} />
+              {/* Rejected segment */}
+              <circle cx="56" cy="56" r="40" stroke="#ef4444" strokeWidth="10" fill="transparent" strokeDasharray={251} strokeDashoffset={251 - (251 * rejectedPercent) / 100} strokeLinecap="round" className="origin-center" style={{ transform: `rotate(${(approvedPercent + pendingPercent) * 3.6}deg)` }} />
             </svg>
             <div className="absolute flex flex-col items-center">
-              <span className="text-xl font-extrabold text-slate-805 leading-none">82</span>
+              <span className="text-xl font-extrabold text-slate-850 leading-none">{totalRequestsCount}</span>
               <span className="text-[7.5px] text-slate-500 font-bold mt-1 uppercase tracking-wider">Total</span>
             </div>
           </div>
           {/* Legend */}
-          <div className="space-y-1 text-[9px] font-bold text-slate-650 w-full mt-3">
-            <div className="flex justify-between items-center"><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-yellow-500"></span> Pending</span> <span>27 (33%)</span></div>
-            <div className="flex justify-between items-center"><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Approved</span> <span>40 (49%)</span></div>
-            <div className="flex justify-between items-center"><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-red-500"></span> Rejected</span> <span>15 (18%)</span></div>
+          <div className="space-y-1 text-[9px] font-bold text-slate-655 w-full mt-3">
+            <div className="flex justify-between items-center"><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-yellow-500"></span> Pending</span> <span>{totalPending} ({pendingPercent}%)</span></div>
+            <div className="flex justify-between items-center"><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Approved</span> <span>{totalApproved} ({approvedPercent}%)</span></div>
+            <div className="flex justify-between items-center"><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-red-500"></span> Rejected</span> <span>{totalRejected} ({rejectedPercent}%)</span></div>
           </div>
         </div>
 
@@ -274,13 +420,13 @@ const AdminDashboard = () => {
           </div>
           <div className="space-y-4">
             {[
-              { block: 'Block A', count: 12, max: 15, color: 'bg-purple-650' },
-              { block: 'Block B', count: 9, max: 15, color: 'bg-blue-600' },
-              { block: 'Block C', count: 7, max: 15, color: 'bg-emerald-500' },
-              { block: 'Block D', count: 4, max: 15, color: 'bg-yellow-550' }
+              { block: 'Block A', count: blockA, max: Math.max(blockA, 15), color: 'bg-purple-650' },
+              { block: 'Block B', count: blockB, max: Math.max(blockB, 15), color: 'bg-blue-600' },
+              { block: 'Block C', count: blockC, max: Math.max(blockC, 15), color: 'bg-emerald-500' },
+              { block: 'Block D', count: blockD, max: Math.max(blockD, 15), color: 'bg-yellow-550' }
             ].map((item, idx) => (
               <div key={idx} className="space-y-1.5">
-                <div className="flex justify-between items-center text-[10px] font-bold text-slate-800 leading-none">
+                <div className="flex justify-between items-center text-[10px] font-bold text-slate-805 leading-none">
                   <span>{item.block}</span>
                   <span className="font-mono font-extrabold">{item.count}</span>
                 </div>
@@ -334,8 +480,8 @@ const AdminDashboard = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="font-bold text-slate-800 block">{req.name}</span>
-                        <span className="text-[9px] text-slate-500 block font-mono">{req.roll}</span>
+                        <span className="font-bold text-slate-800 block text-left">{req.name}</span>
+                        <span className="text-[9px] text-slate-500 block font-mono text-left">{req.roll}</span>
                       </td>
                       <td className="px-4 py-3 truncate max-w-[120px]">{req.details}</td>
                       <td className="px-4 py-3 text-[10px]">{req.date}</td>
@@ -377,7 +523,7 @@ const AdminDashboard = () => {
         <div className="space-y-6">
           {/* Pass Verification Widget */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="text-xs font-bold text-slate-800 font-display flex items-center gap-1.5">
+            <h3 className="text-xs font-bold text-slate-805 font-display flex items-center gap-1.5">
               <Shield className="h-4.5 w-4.5 text-blue-600" /> Pass Verification
             </h3>
             <p className="text-[9px] text-slate-500 font-sans leading-normal">Verify any pass validity by scanning the QR code on the student outpass or parent visit pass.</p>
@@ -426,7 +572,7 @@ const AdminDashboard = () => {
                 { title: 'New mess timings from next week', time: '1 day ago' },
                 { title: 'Library will remain closed on Sunday', time: '2 days ago' }
               ].map((ann, idx) => (
-                <div key={idx} className="flex gap-2.5 items-start border-b border-slate-50 pb-3 last:border-0 last:pb-0">
+                <div key={idx} className="flex gap-2.5 items-start border-b border-slate-55 pb-3 last:border-0 last:pb-0">
                   <div className="h-7 w-7 rounded-lg bg-blue-500/10 text-blue-605 flex items-center justify-center flex-shrink-0">
                     <Megaphone className="h-4 w-4" />
                   </div>

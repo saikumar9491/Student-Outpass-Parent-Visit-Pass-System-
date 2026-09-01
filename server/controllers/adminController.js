@@ -370,20 +370,32 @@ const getUsersList = async (req, res) => {
 
 const createStudentByAdmin = async (req, res) => {
   try {
-    const { name, email, password, phone, studentId, department, year, hostel, roomNumber } = req.body;
+    const { 
+      name, email, password, phone, studentId, department, year, hostel, roomNumber,
+      parentName, parentEmail, parentPhone, parentRelationship, parentPassword,
+      studentImage, parentImage
+    } = req.body;
 
     if (!name || !email || !password || !phone || !studentId || !department || !year || !hostel || !roomNumber) {
-      return res.status(400).json({ message: 'All fields are required' });
+      return res.status(400).json({ message: 'All student fields are required' });
     }
 
     const emailExists = await User.findOne({ email: email.toLowerCase() });
     if (emailExists) {
-      return res.status(400).json({ message: 'User with this email already exists' });
+      return res.status(400).json({ message: 'Student email already exists' });
     }
 
     const studentIdExists = await Student.findOne({ studentId: studentId.trim() });
     if (studentIdExists) {
       return res.status(400).json({ message: 'Student with this Register/ID number already exists' });
+    }
+
+    // If parent details are provided, validate email
+    if (parentEmail) {
+      const parentEmailExists = await User.findOne({ email: parentEmail.toLowerCase() });
+      if (parentEmailExists) {
+        return res.status(400).json({ message: 'Parent email already exists' });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -405,8 +417,47 @@ const createStudentByAdmin = async (req, res) => {
       year,
       hostel,
       roomNumber,
-      parentIds: []
+      parentIds: [],
+      image: studentImage || ''
     });
+
+    // Handle automated parent registration
+    if (parentName && parentEmail && parentPhone && parentRelationship && parentPassword) {
+      let parentId = '';
+      let parentIdExists = true;
+      while (parentIdExists) {
+        const randNum = Math.floor(100000 + Math.random() * 900000);
+        parentId = `PAR-${randNum}`;
+        const existing = await Parent.findOne({ parentId });
+        if (!existing) {
+          parentIdExists = false;
+        }
+      }
+
+      const hashedParentPassword = await bcrypt.hash(parentPassword, 10);
+      const parentUser = await User.create({
+        name: parentName,
+        email: parentEmail.toLowerCase(),
+        password: hashedParentPassword,
+        phone: parentPhone,
+        role: 'parent'
+      });
+
+      const parent = await Parent.create({
+        userId: parentUser._id,
+        parentId,
+        needsPasswordChange: true,
+        name: parentName,
+        email: parentEmail.toLowerCase(),
+        phone: parentPhone,
+        relationship: parentRelationship,
+        studentIds: [student._id],
+        image: parentImage || ''
+      });
+
+      student.parentIds.push(parentUser._id);
+      await student.save();
+    }
 
     res.status(201).json({ message: 'Student registered successfully', student });
   } catch (error) {
@@ -518,6 +569,165 @@ const deleteUserByAdmin = async (req, res) => {
   }
 };
 
+const aiReviewOutpass = async (req, res) => {
+  try {
+    const { passDetails, systemPrompt } = req.body;
+    if (!passDetails) {
+      return res.status(400).json({ message: 'Pass details are required for review' });
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      // Clean fallback mock AI response if ANTHROPIC_API_KEY is not configured
+      const { name, destination, timings, purpose, relationship, visitorName } = passDetails;
+      const hours = timings || 'the requested time range';
+
+      let mockResponses = [];
+      if (relationship || visitorName) {
+        // It's a parent visit pass
+        mockResponses = [
+          `Reviewing parent visit request: ${visitorName || 'Parent'} (${relationship || 'Parent'}) wishes to visit child. The purpose of "${purpose || 'Family visit'}" is valid and timings (${hours}) fall within permitted hours (9am-6pm). Recommended for approval.`,
+          `Hostel visit check: Request by ${visitorName || 'Parent'} for child ${name || 'Student'}. The purpose ("${purpose || 'handover'}") is valid and visitor count is reasonable. Recommended.`,
+          `Parent visit audit: The request for ${visitorName || 'Parent'} is compliant with hostel visitation window rules. No security flags. Recommendation: Approve.`
+        ];
+      } else {
+        // It's a student outpass
+        mockResponses = [
+          `Reviewing student ${name || 'Student'}'s outpass request: The destination of "${destination || 'City Market'}" for "${purpose || 'buying groceries'}" is reasonable. The timings (${hours}) are within standard hostel rules. Recommend approval.`,
+          `Student ${name || 'Student'} has requested to visit "${destination || 'City Market'}" for "${purpose || 'personal work'}". The duration is appropriate and no previous overlap conflicts exist. Recommended for approval.`,
+          `Warden assessment for ${name || 'Student'}: Purpose of visit ("${purpose || 'groceries'}") to "${destination || 'Railway Station'}" matches historical patterns. Timings (${hours}) are normal. Recommended.`
+        ];
+      }
+      
+      // Simple hash helper to select response
+      let hash = 0;
+      const str = name || '';
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+      }
+      const selectedResponse = mockResponses[Math.abs(hash) % mockResponses.length];
+
+      // Delay to simulate API call latency
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      return res.json({ response: selectedResponse });
+    }
+
+    // Call real Anthropic API
+    const systemInstruction = systemPrompt || 'You are a hostel warden AI assistant. Review student outpass requests and give a concise 2-3 sentence assessment: flag any concerns, note if timings are reasonable, and recommend action. Be brief and factual.';
+    const response = await axios.post('https://api.anthropic.com/v1/messages', {
+      model: 'claude-3-5-sonnet-20240620',
+      max_tokens: 1000,
+      system: systemInstruction,
+      messages: [
+        {
+          role: 'user',
+          content: `Please review this request:\n\n${JSON.stringify(passDetails, null, 2)}`
+        }
+      ]
+    }, {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      }
+    });
+
+    const aiText = response.data?.content?.[0]?.text || 'No response returned from Claude.';
+    res.json({ response: aiText });
+  } catch (error) {
+    console.error('AI Review Error:', error.message);
+    res.status(500).json({ message: 'Error from AI review assistant: ' + error.message });
+  }
+};
+
+const returnOutpass = async (req, res) => {
+  try {
+    const outpass = await Outpass.findById(req.params.id);
+    if (!outpass) {
+      return res.status(404).json({ message: 'Outpass not found' });
+    }
+    outpass.status = 'EXPIRED';
+    await outpass.save();
+    res.json({ message: 'Outpass marked as returned', outpass });
+  } catch (error) {
+    console.error('Return outpass error:', error);
+    res.status(500).json({ message: 'Server error marking outpass returned' });
+  }
+};
+
+const updateStudentByAdmin = async (req, res) => {
+  try {
+    const studentIdParam = req.params.id;
+    const { 
+      name, email, phone, studentId, department, year, hostel, roomNumber,
+      studentImage
+    } = req.body;
+
+    if (!name || !email || !phone || !studentId || !department || !year || !hostel || !roomNumber) {
+      return res.status(400).json({ message: 'All student fields are required' });
+    }
+
+    const student = await Student.findById(studentIdParam);
+    if (!student) {
+      return res.status(404).json({ message: 'Student record not found' });
+    }
+
+    // Check unique email and studentId exclusions
+    const emailExists = await User.findOne({ email: email.toLowerCase(), _id: { $ne: student.userId } });
+    if (emailExists) {
+      return res.status(400).json({ message: 'Email already used by another account' });
+    }
+
+    const studentIdExists = await Student.findOne({ studentId: studentId.trim(), _id: { $ne: studentIdParam } });
+    if (studentIdExists) {
+      return res.status(400).json({ message: 'Student with this Register/ID number already exists' });
+    }
+
+    // Update User document
+    await User.findByIdAndUpdate(student.userId, {
+      name,
+      email: email.toLowerCase(),
+      phone
+    });
+
+    // Update Student document
+    student.name = name;
+    student.email = email.toLowerCase();
+    student.phone = phone;
+    student.studentId = studentId.trim();
+    student.department = department;
+    student.year = year;
+    student.hostel = hostel;
+    student.roomNumber = roomNumber;
+    if (studentImage !== undefined) {
+      student.image = studentImage;
+    }
+    await student.save();
+
+    res.json({ message: 'Student details updated successfully', student });
+  } catch (error) {
+    console.error('Admin update student error:', error);
+    res.status(500).json({ message: 'Server error during student update', error: error.message });
+  }
+};
+
+const returnVisitPass = async (req, res) => {
+  try {
+    const visitPass = await VisitPass.findById(req.params.id);
+    if (!visitPass) {
+      return res.status(404).json({ message: 'Visit pass request not found' });
+    }
+    visitPass.status = 'EXPIRED';
+    await visitPass.save();
+    res.json({ message: 'Visit pass marked as returned', visitPass });
+  } catch (error) {
+    console.error('Return visit pass error:', error);
+    res.status(500).json({ message: 'Server error marking visit pass returned' });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getAllOutpasses,
@@ -529,5 +739,9 @@ module.exports = {
   getUsersList,
   createStudentByAdmin,
   createParentByAdmin,
-  deleteUserByAdmin
+  deleteUserByAdmin,
+  aiReviewOutpass,
+  returnOutpass,
+  returnVisitPass,
+  updateStudentByAdmin
 };

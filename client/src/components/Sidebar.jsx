@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, FileText, ClipboardList, Scan, Users, 
   Send, History, FilePlus, BookOpen, Calendar, Award, Bell, 
-  User, Lock, HelpCircle, GraduationCap, Shield, Settings, Activity, Megaphone 
+  User, Lock, HelpCircle, GraduationCap, Shield, Settings, Activity, Megaphone, Building 
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -63,12 +63,14 @@ const Sidebar = () => {
           </NavLink>
 
           <NavLink
-            to="/admin?tab=active-passes"
-            className={`flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-              location.search.includes('tab=active-passes')
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15'
-                : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
-            }`}
+            to="/admin/active-passes"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                isActive
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15'
+                  : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
+              }`
+            }
           >
             <Shield className="h-4 w-4" />
             <span>Active Passes</span>
@@ -121,14 +123,16 @@ const Sidebar = () => {
           </NavLink>
 
           <NavLink
-            to="/admin?tab=hostel-blocks"
-            className={`flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-              location.search.includes('tab=hostel-blocks')
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15 font-bold'
-                : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
-            }`}
+            to="/admin/hostel-blocks"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                isActive || location.search.includes('tab=hostel-blocks')
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15 font-bold'
+                  : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
+              }`
+            }
           >
-            <GraduationCap className="h-4 w-4" />
+            <Building className="h-4 w-4" />
             <span>Hostel Blocks</span>
           </NavLink>
 
@@ -277,25 +281,16 @@ const Sidebar = () => {
             <span>My Outpasses</span>
           </NavLink>
 
-          <NavLink
-            to="/student?tab=active-outpass"
-            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-              location.search.includes('tab=active-outpass')
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15'
-                : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
-            }`}
-          >
-            <Shield className="h-4.5 w-4.5" />
-            <span>Active Outpass</span>
-          </NavLink>
 
           <NavLink
-            to="/student?tab=visit-history"
-            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-              location.search.includes('tab=visit-history')
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15'
-                : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
-            }`}
+            to="/student/visit-history"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                isActive
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15'
+                  : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
+              }`
+            }
           >
             <ClipboardList className="h-4.5 w-4.5" />
             <span>Visit Pass History</span>
@@ -480,7 +475,7 @@ const Sidebar = () => {
   const currentLinks = links[user.role] || [];
 
   return (
-    <aside className="no-print w-64 bg-[#110e2c] border-r border-slate-900 flex flex-col min-h-screen text-slate-300">
+    <aside className="no-print w-64 bg-[#110e2c] border-r border-slate-900 flex flex-col h-screen sticky top-0 flex-shrink-0 text-slate-300 z-30">
       {/* Brand Header */}
       <div className="h-16 flex items-center px-6 gap-3 border-b border-slate-850">
         <img 

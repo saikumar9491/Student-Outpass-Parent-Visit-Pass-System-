@@ -133,9 +133,18 @@ const ManageParents = () => {
           filteredParents.map(parent => (
             <div key={parent._id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-700 transition-colors shadow-lg space-y-4 relative">
               <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-slate-750 text-sm font-display">{parent.name}</h3>
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold uppercase block mt-0.5">ID: {parent.parentId || 'N/A'}</span>
+                <div className="flex items-center gap-3 text-left">
+                  {parent.image ? (
+                    <img src={parent.image} alt={parent.name} className="h-10 w-10 object-cover rounded-full border border-slate-200" />
+                  ) : (
+                    <div className="h-10 w-10 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 text-slate-400 font-bold text-sm">
+                      {parent.name ? parent.name.charAt(0) : 'P'}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-bold text-slate-750 text-sm font-display">{parent.name}</h3>
+                    <span className="text-[10px] text-emerald-400 font-mono font-bold uppercase block mt-0.5">ID: {parent.parentId || 'N/A'}</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] bg-emerald-950/40 border border-emerald-900/50 text-emerald-450 px-2 py-0.5 rounded font-semibold">

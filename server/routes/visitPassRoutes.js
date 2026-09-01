@@ -11,7 +11,7 @@ router.route('/')
   .post(protect, authorize('parent'), requestVisitPass);
 
 router.route('/my')
-  .get(protect, authorize('parent'), getMyVisitRequests);
+  .get(protect, authorize('parent', 'student'), getMyVisitRequests);
 
 router.route('/:id')
   .get(protect, authorize('parent', 'student', 'admin'), getVisitPassDetails);

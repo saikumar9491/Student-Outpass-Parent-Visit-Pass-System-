@@ -114,7 +114,7 @@ const StudentDashboard = () => {
         {/* Profile Card Header link */}
         <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-1.5 shadow-sm">
           <img 
-            src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" 
+            src={profile?.image || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"} 
             alt="Student Avatar" 
             className="h-7 w-7 rounded-full object-cover border border-slate-250"
           />
@@ -125,8 +125,8 @@ const StudentDashboard = () => {
         </div>
       </div>
 
-      {/* Metrics Row (5 columns) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      {/* Metrics Row (4 columns) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Total Outpass */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-sm min-h-[95px]">
           <div className="flex items-center justify-between">
@@ -170,20 +170,8 @@ const StudentDashboard = () => {
             <div className="h-7 w-7 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center"><XCircle className="h-4 w-4" /></div>
           </div>
           <div className="mt-2">
-            <h4 className="text-lg font-bold text-red-500 leading-none">{rejectedCount}</h4>
+            <h4 className="text-lg font-bold text-red-505 leading-none">{rejectedCount}</h4>
             <span className="text-[8px] text-red-505 font-bold block mt-1">This Semester</span>
-          </div>
-        </div>
-
-        {/* Active Outpass */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-sm min-h-[95px]">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Active Outpass</span>
-            <div className="h-7 w-7 rounded-lg bg-purple-500/10 text-purple-650 flex items-center justify-center"><Shield className="h-4 w-4" /></div>
-          </div>
-          <div className="mt-2">
-            <h4 className="text-lg font-bold text-purple-650 leading-none">{activeOutpass ? 1 : 0}</h4>
-            <span className="text-[8px] text-slate-550 font-bold block mt-1">Currently Active</span>
           </div>
         </div>
       </div>
@@ -193,7 +181,7 @@ const StudentDashboard = () => {
         {/* Left Column: Student Details Card (span 6) */}
         <div className="lg:col-span-6 bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row items-center gap-6 relative overflow-hidden">
           <img 
-            src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=256&h=256&q=80" 
+            src={profile?.image || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=256&h=256&q=80"} 
             alt="Student Details Photo" 
             className="h-28 w-28 rounded-2xl object-cover border border-slate-200 shadow"
           />
@@ -222,7 +210,7 @@ const StudentDashboard = () => {
         </div>
 
         {/* Right Column: Quick Actions Grid (span 4) */}
-        <div className="lg:col-span-4 grid grid-cols-3 gap-3">
+        <div className="lg:col-span-4 grid grid-cols-2 gap-3">
           {/* Action 1: Apply Outpass */}
           <div 
             onClick={() => navigate('/student/apply')}
@@ -251,24 +239,6 @@ const StudentDashboard = () => {
               <p className="text-[8px] text-slate-450 font-bold mt-1 leading-normal font-sans">View all outing history logs.</p>
             </div>
             <ArrowRight className="h-3.5 w-3.5 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-
-          {/* Action 3: Active Outpass */}
-          <div 
-            onClick={() => {
-              if (activeOutpass) navigate(`/student/outpass/${activeOutpass._id}`);
-              else toast.error('No active outpass available');
-            }}
-            className="bg-white border border-slate-200 rounded-2xl p-4 text-center flex flex-col justify-between items-center hover:border-purple-500 hover:shadow transition-all cursor-pointer group h-full"
-          >
-            <div className="h-9 w-9 rounded-xl bg-purple-500/10 text-purple-650 flex items-center justify-center">
-              <QrCode className="h-4.5 w-4.5" />
-            </div>
-            <div className="my-2">
-              <h4 className="text-[10px] font-extrabold text-slate-850 leading-none">Active Outpass</h4>
-              <p className="text-[8px] text-slate-455 font-bold mt-1 leading-normal font-sans">View active permit details.</p>
-            </div>
-            <ArrowRight className="h-3.5 w-3.5 text-purple-650 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
       </div>
@@ -415,43 +385,8 @@ const StudentDashboard = () => {
           </div>
         </div>
 
-        {/* Active Outpass + Notices widgets (span 3) */}
-        <div className="lg:col-span-3 space-y-5">
-          {/* Active Outpass Widget */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3 text-center">
-            <h3 className="text-xs font-bold text-slate-800 font-display flex items-center gap-1.5 text-left border-b border-slate-100 pb-2">
-              <Shield className="h-4.5 w-4.5 text-blue-600" /> Active Outpass
-            </h3>
-            
-            {activeOutpass ? (
-              <div className="space-y-3 text-left">
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-[10px] font-bold text-slate-700">
-                  <p>Destination: <span className="text-slate-850 font-extrabold">{activeOutpass.destination}</span></p>
-                  <p>Return by: <span className="text-slate-850 font-extrabold font-mono">{new Date(activeOutpass.expectedReturnDate).toLocaleDateString()}</span></p>
-                </div>
-                <button 
-                  onClick={() => navigate(`/student/outpass/${activeOutpass._id}`)}
-                  className="w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-650 text-white rounded-xl text-[10px] font-bold shadow-md shadow-blue-500/10 cursor-pointer flex items-center justify-center gap-1"
-                >
-                  View Digital Pass <ArrowRight className="h-3 w-3" />
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3.5 py-2">
-                <div className="h-10 w-10 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <p className="text-[9px] text-slate-500 leading-normal font-sans">You don't have any active outpass. Apply for a new outpass to get started.</p>
-                <button 
-                  onClick={() => navigate('/student/apply')}
-                  className="w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-650 text-white rounded-xl text-[10px] font-bold cursor-pointer"
-                >
-                  Apply Outpass
-                </button>
-              </div>
-            )}
-          </div>
-
+        {/* Notices widget (span 3) */}
+        <div className="lg:col-span-3">
           {/* Notices Widget */}
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3.5">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">

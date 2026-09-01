@@ -78,8 +78,8 @@ const Login = () => {
             onClick={() => setActiveTab('student')}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
               activeTab === 'student'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-600 hover:text-slate-750'
+                ? 'bg-[#3b82f6] hover:bg-[#1d4ed8] text-white shadow'
+                : 'text-slate-600 hover:bg-slate-200'
             }`}
           >
             <Compass className="h-3.5 w-3.5" /> Student
@@ -88,8 +88,8 @@ const Login = () => {
             onClick={() => setActiveTab('parent')}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
               activeTab === 'parent'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-600 hover:text-slate-750'
+                ? 'bg-[#3b82f6] hover:bg-[#1d4ed8] text-white shadow'
+                : 'text-slate-600 hover:bg-slate-200'
             }`}
           >
             <Users className="h-3.5 w-3.5" /> Parent
@@ -98,8 +98,8 @@ const Login = () => {
             onClick={() => setActiveTab('admin')}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all ${
               activeTab === 'admin'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-600 hover:text-slate-750'
+                ? 'bg-[#3b82f6] hover:bg-[#1d4ed8] text-white shadow'
+                : 'text-slate-600 hover:bg-slate-200'
             }`}
           >
             <Shield className="h-3.5 w-3.5" /> Admin
@@ -110,7 +110,11 @@ const Login = () => {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-              {activeTab === 'parent' ? 'Parent ID or Email Address' : 'Email Address'}
+              {activeTab === 'parent' 
+                ? 'Parent ID or Email Address' 
+                : activeTab === 'student'
+                  ? 'Roll ID or Email Address'
+                  : 'Email Address'}
             </label>
             <div className="relative">
               <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-500" />
@@ -119,7 +123,13 @@ const Login = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={activeTab === 'parent' ? 'PAR-XXXXXX or parent@example.com' : 'email@example.edu'}
+                placeholder={
+                  activeTab === 'parent' 
+                    ? 'PAR-XXXXXX or parent@example.com' 
+                    : activeTab === 'student'
+                      ? 'e.g. 12622006 or student@example.edu'
+                      : 'email@example.edu'
+                }
                 className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2.5 pl-11 pr-4 text-sm text-slate-850 placeholder-slate-450 focus:outline-none transition-colors"
               />
             </div>
@@ -143,7 +153,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl py-3 flex items-center justify-center gap-2 transition-colors duration-200 shadow-lg shadow-blue-600/10 hover:shadow-blue-600/20 active:scale-98 disabled:opacity-50"
+            className="w-full bg-[#3b82f6] hover:bg-[#1d4ed8] text-white font-semibold text-sm rounded-xl py-3 flex items-center justify-center gap-2 transition-colors duration-200 shadow-lg shadow-blue-600/10 hover:shadow-blue-600/20 active:scale-98 disabled:opacity-50"
           >
             <LogIn className="h-4.5 w-4.5" /> {isSubmitting ? 'Logging in...' : 'Sign In'}
           </button>

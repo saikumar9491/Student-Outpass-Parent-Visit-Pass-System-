@@ -83,6 +83,10 @@ const studentSchema = new mongoose.Schema(
         },
       ],
     },
+    image: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,

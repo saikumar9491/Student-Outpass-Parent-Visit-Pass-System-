@@ -12,7 +12,11 @@ const {
   getUsersList,
   createStudentByAdmin,
   createParentByAdmin,
-  deleteUserByAdmin
+  deleteUserByAdmin,
+  aiReviewOutpass,
+  returnOutpass,
+  returnVisitPass,
+  updateStudentByAdmin
 } = require('../controllers/adminController');
 
 // All admin routes are protected and require admin role
@@ -24,11 +28,15 @@ router.get('/outpasses', getAllOutpasses);
 router.get('/visit-passes', getAllVisitPasses);
 router.put('/outpasses/:id/approve', approveOutpass);
 router.put('/outpasses/:id/reject', rejectOutpass);
+router.put('/outpasses/:id/return', returnOutpass);
 router.put('/visit-passes/:id/approve', approveVisitPass);
 router.put('/visit-passes/:id/reject', rejectVisitPass);
+router.put('/visit-passes/:id/return', returnVisitPass);
 router.get('/users', getUsersList);
 router.post('/users/student', createStudentByAdmin);
+router.put('/users/student/:id', updateStudentByAdmin);
 router.post('/users/parent', createParentByAdmin);
 router.delete('/users/:id', deleteUserByAdmin);
+router.post('/ai-review', aiReviewOutpass);
 
 module.exports = router;

@@ -151,11 +151,20 @@ const ParentDashboard = () => {
 
         {/* Parent ID Card */}
         <div className="bg-slate-950/20 backdrop-blur-md border border-white/10 rounded-2xl p-4 min-w-[200px] flex items-center justify-between gap-4">
-          <div className="space-y-0.5 text-left">
-            <span className="text-[9px] uppercase tracking-wider text-slate-300 font-bold">Parent ID</span>
-            <p className="text-sm font-bold font-mono tracking-wide">{profile?.parentId || 'PAR-983413'}</p>
+          <div className="flex items-center gap-3">
+            {profile?.image ? (
+              <img src={profile.image} alt={profile.name} className="h-9 w-9 object-cover rounded-full border border-white/20" />
+            ) : (
+              <div className="h-9 w-9 bg-white/10 rounded-full flex items-center justify-center border border-white/20 text-white font-bold text-sm">
+                {profile?.name ? profile.name.charAt(0) : 'P'}
+              </div>
+            )}
+            <div className="space-y-0.5 text-left">
+              <span className="text-[9px] uppercase tracking-wider text-slate-300 font-bold">Parent ID</span>
+              <p className="text-sm font-bold font-mono tracking-wide">{profile?.parentId || 'PAR-983413'}</p>
+            </div>
           </div>
-          <span className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-350 text-[9px] font-bold rounded-lg uppercase tracking-wider flex items-center gap-1">
+          <span className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-350 text-[9px] font-bold rounded-lg uppercase tracking-wider flex items-center gap-1 flex-shrink-0">
             <CheckCircle className="h-3 w-3" /> Verified Parent
           </span>
         </div>
@@ -219,7 +228,7 @@ const ParentDashboard = () => {
           <div className="lg:col-span-2 bg-gradient-to-br from-[#0e0c33] to-[#1a154d] text-white border border-slate-900 rounded-3xl p-5 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="flex items-center gap-4">
               <img 
-                src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=256&h=256&q=80" 
+                src={activeChild.image || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=256&h=256&q=80"} 
                 alt="Student Profile" 
                 className="h-16 w-16 rounded-2xl object-cover border-2 border-blue-500 shadow-lg"
               />

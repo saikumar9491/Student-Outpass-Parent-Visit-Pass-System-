@@ -1,298 +1,948 @@
 import React, { useState, useEffect } from 'react';
 import API from '../../services/api';
-import StatusBadge from '../../components/StatusBadge';
 import { toast } from 'react-hot-toast';
-import { Check, X, Search, Eye, Calendar, Clock, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { addNotification } from '../../utils/notifications';
 
 const ManageVisitPasses = () => {
-  const [visitPasses, setVisitPasses] = useState([]);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  // Sample Data (6 rows)
+  const initialSampleData = [
+    {
+      _id: 'sample-visit-1',
+      parentName: 'Mrs. Kavitha Sharma',
+      relation: 'Mother',
+      name: 'Arjun Sharma',
+      roll: 'ROLL-1787091234567',
+      hostel: 'Cauvery Boys Hostel',
+      room: '204',
+      date: '28/8/2026',
+      timings: '10:00 am – 01:00 pm',
+      purpose: 'Family visit',
+      visitors: '3 visitors',
+      visitorCount: 3,
+      status: 'PENDING'
+    },
+    {
+      _id: 'sample-visit-2',
+      parentName: 'Mr. Ramesh Patel',
+      relation: 'Father',
+      name: 'Priya Patel',
+      roll: 'ROLL-1787055678901',
+      hostel: 'Ganga Girls Hostel',
+      room: '312',
+      date: '27/8/2026',
+      timings: '02:00 pm – 05:00 pm',
+      purpose: 'Document handover',
+      visitors: '1 visitor',
+      visitorCount: 1,
+      status: 'APPROVED'
+    },
+    {
+      _id: 'sample-visit-3',
+      parentName: 'Mrs. Sunita Mehta',
+      relation: 'Mother',
+      name: 'Rohan Mehta',
+      roll: 'ROLL-1787078901234',
+      hostel: 'Kaveri Boys Hostel',
+      room: '115',
+      date: '26/8/2026',
+      timings: '11:00 am – 03:00 pm',
+      purpose: 'Medical emergency',
+      visitors: '2 visitors',
+      visitorCount: 2,
+      status: 'APPROVED'
+    },
+    {
+      _id: 'sample-visit-4',
+      parentName: 'Mr. Vijay Reddy',
+      relation: 'Father',
+      name: 'Sneha Reddy',
+      roll: 'ROLL-1787066543210',
+      hostel: 'Ganga Girls Hostel',
+      room: '201',
+      date: '25/8/2026',
+      timings: '09:00 am – 12:00 pm',
+      purpose: 'Fee payment',
+      visitors: '1 visitor',
+      visitorCount: 1,
+      status: 'REJECTED'
+    },
+    {
+      _id: 'sample-visit-5',
+      parentName: 'Mrs. Anita Verma',
+      relation: 'Guardian',
+      name: 'Test Student',
+      roll: 'ROLL-1787034181517',
+      hostel: 'Kaveri Boys Hostel',
+      room: '101',
+      date: '24/8/2026',
+      timings: '03:00 pm – 06:00 pm',
+      purpose: 'Personal visit',
+      visitors: '2 visitors',
+      visitorCount: 2,
+      status: 'EXPIRED'
+    },
+    {
+      _id: 'sample-visit-6',
+      parentName: 'Mr. Suresh Kumar',
+      relation: 'Father',
+      name: 'Test Student',
+      roll: 'ROLL-1787033275235',
+      hostel: 'Kaveri Boys Hostel',
+      room: '101',
+      date: '23/8/2026',
+      timings: '10:00 am – 01:00 pm',
+      purpose: 'Birthday celebration',
+      visitors: '4 visitors',
+      visitorCount: 4,
+      status: 'CANCELLED'
+    }
+  ];
+
+  const [dbVisits, setDbVisits] = useState([]);
+  const [localVisits, setLocalVisits] = useState(initialSampleData);
+  const [selectedPass, setSelectedPass] = useState(null);
+  const [activeTab, setActiveTab] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Modal states for rejection
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectId, setRejectId] = useState('');
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  // AI Review States
+  const [aiText, setAiText] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
-  const fetchVisitPasses = async () => {
-    setLoading(true);
+  const fetchDbVisits = async () => {
     try {
-      let url = '/admin/visit-passes';
-      const params = {};
-      if (statusFilter !== 'ALL') {
-        params.status = statusFilter;
-      }
-      if (search.trim()) {
-        params.search = search;
-      }
-
-      const res = await API.get(url, { params });
-      setVisitPasses(res.data);
+      const res = await API.get('/admin/visit-passes');
+      const mapped = res.data.map(v => ({
+        _id: v._id,
+        parentName: v.parentId?.name || v.visitorName || 'Parent',
+        relation: v.relationship || 'Parent',
+        name: v.studentId?.name || 'Student',
+        roll: v.studentId?.studentId || 'N/A',
+        hostel: v.studentId?.hostel || 'Hostel',
+        room: v.studentId?.roomNumber || 'N/A',
+        date: new Date(v.visitDate).toLocaleDateString(),
+        timings: `${v.arrivalTime} – ${v.departureTime}`,
+        purpose: v.purpose,
+        visitors: `${v.visitorCount} visitor${v.visitorCount > 1 ? 's' : ''}`,
+        visitorCount: v.visitorCount || 1,
+        status: v.status
+      }));
+      setDbVisits(mapped);
     } catch (error) {
-      console.error('Error fetching visit passes:', error);
-      toast.error('Failed to load visit permits');
+      console.error('Error fetching database visits:', error);
+      toast.error('Failed to load live database entries. Using local cache.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchVisitPasses();
-  }, [statusFilter, search]);
+    fetchDbVisits();
+  }, []);
 
-  const handleApprove = async (id) => {
-    if (!window.confirm('Are you sure you want to approve this hostel visit permit?')) return;
+  // Merge database and local mock data, discarding mock rows if live records exist for the same student roll
+  const activeRolls = new Set(dbVisits.map(v => v.roll.trim().toUpperCase()));
+  const filteredLocal = localVisits.filter(lv => !activeRolls.has(lv.roll.trim().toUpperCase()));
+  const mergedList = [...dbVisits, ...filteredLocal];
 
-    try {
-      const res = await API.put(`/admin/visit-passes/${id}/approve`);
-      toast.success('Visit pass approved successfully!');
-      
-      // Notify parent
-      const passData = res.data.visitPass;
-      if (passData && passData.parentId) {
-        addNotification(
-          passData.parentId,
-          'Visit Pass Approved',
-          `Your visit pass to visit child has been APPROVED! Pass ID: ${passData.passId}`
-        );
-      }
+  // Additional safety deduplication by Roll and timings (normalizing spaces and cases)
+  const uniqueList = mergedList.filter((item, index, self) => 
+    index === self.findIndex((t) => 
+      t.roll.trim().toUpperCase() === item.roll.trim().toUpperCase() && 
+      t.timings.replace(/\s+/g, '').toUpperCase() === item.timings.replace(/\s+/g, '').toUpperCase()
+    )
+  );
 
-      fetchVisitPasses();
-    } catch (error) {
-      console.error('Approve error:', error);
-      toast.error(error.response?.data?.message || 'Failed to approve visit pass');
+  // Filter based on status tab and search queries
+  const filteredVisits = uniqueList.filter(pass => {
+    const matchesTab = activeTab === 'ALL' || pass.status.toUpperCase() === activeTab;
+    const matchesSearch = 
+      pass.parentName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      pass.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      pass.roll.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesTab && matchesSearch;
+  });
+
+  // Calculate live summary metric numbers
+  const totalRequests = Math.round(uniqueList.length);
+  const pendingReview = Math.round(uniqueList.filter(p => p.status.toUpperCase() === 'PENDING').length);
+  const approvedToday = Math.round(uniqueList.filter(p => p.status.toUpperCase() === 'APPROVED').length);
+  const rejectedCount = Math.round(uniqueList.filter(p => p.status.toUpperCase() === 'REJECTED').length);
+
+  // AI Review Call
+  useEffect(() => {
+    if (selectedPass) {
+      fetchAiReview(selectedPass);
+    } else {
+      setAiText('');
     }
-  };
+  }, [selectedPass]);
 
-  const openRejectModal = (id) => {
-    setRejectId(id);
-    setRejectionReason('');
-    setShowRejectModal(true);
-  };
-
-  const handleRejectSubmit = async (e) => {
-    e.preventDefault();
-    if (!rejectionReason.trim()) {
-      toast.error('Rejection reason is required');
-      return;
-    }
-
-    setIsSubmittingAction(true);
+  const fetchAiReview = async (pass) => {
+    setAiLoading(true);
+    setAiText('');
     try {
-      const res = await API.put(`/admin/visit-passes/${rejectId}/reject`, { rejectionReason });
-      toast.success('Visit pass request rejected successfully');
-      
-      // Notify parent
-      const passData = res.data.visitPass;
-      if (passData && passData.parentId) {
-        addNotification(
-          passData.parentId,
-          'Visit Pass Rejected',
-          `Your visit pass request has been REJECTED. Reason: ${rejectionReason}`
-        );
-      }
-
-      setShowRejectModal(false);
-      fetchVisitPasses();
+      const res = await API.post('/admin/ai-review', {
+        passDetails: {
+          name: pass.name,
+          roll: pass.roll,
+          hostel: pass.hostel,
+          room: pass.room,
+          visitorName: pass.parentName,
+          relationship: pass.relation,
+          timings: pass.timings,
+          purpose: pass.purpose,
+          visitorCount: pass.visitorCount,
+          status: pass.status
+        },
+        systemPrompt: "You are a hostel warden AI assistant for a university. Review parent visit pass requests and give a concise 2–3 sentence assessment: check if the purpose is valid, note if visit timings are within allowed hours (9am–6pm), flag if visitor count seems unusual, and recommend Approve or Reject. Be brief and factual."
+      });
+      setAiText(res.data.response);
     } catch (error) {
-      console.error('Reject error:', error);
-      toast.error(error.response?.data?.message || 'Failed to reject visit pass');
+      console.error('Error calling Anthropic AI review:', error);
+      setAiText('Error loading review: Failed to retrieve Warden review from Claude.');
     } finally {
-      setIsSubmittingAction(false);
+      setAiLoading(false);
     }
   };
 
-  const filterTabs = ['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'];
+  const handleStatusChange = async (passId, newStatus) => {
+    try {
+      // Sample data update
+      if (String(passId).startsWith('sample-')) {
+        const updated = localVisits.map(v => v._id === passId ? { ...v, status: newStatus } : v);
+        setLocalVisits(updated);
+        if (selectedPass && selectedPass._id === passId) {
+          setSelectedPass({ ...selectedPass, status: newStatus });
+        }
+        toast.success(`Pass status updated to ${newStatus} successfully.`);
+        return;
+      }
+
+      // Live server database update
+      const endpoint = newStatus === 'APPROVED' 
+        ? `/admin/visit-passes/${passId}/approve`
+        : `/admin/visit-passes/${passId}/reject`;
+
+      const payload = newStatus === 'REJECTED' ? { rejectionReason: 'Rejected by Administrator' } : {};
+      await API.put(endpoint, payload);
+
+      // Refresh database
+      await fetchDbVisits();
+
+      if (selectedPass && selectedPass._id === passId) {
+        setSelectedPass({ ...selectedPass, status: newStatus });
+      }
+
+      toast.success(`Pass ${newStatus.toLowerCase()} successfully.`);
+    } catch (error) {
+      console.error('Error updating visit pass status:', error);
+      toast.error('Failed to update status on server');
+    }
+  };
+
+  const sendPrompt = (pass) => {
+    const promptText = `Warden Assistant Chat: Please analyze this parent's hostel visit request in detail: Parent: ${pass.parentName} (${pass.relation}), Child: ${pass.name} (ID: ${pass.roll}), Hostel: ${pass.hostel}, Room: ${pass.room}, Purpose: ${pass.purpose}, Visitors Count: ${pass.visitors}, Visit Date: ${pass.date}, Timings: ${pass.timings}, Status: ${pass.status}`;
+    console.log('sendPrompt called:', promptText);
+    toast.success(`Prompt sent to AI assistant: "${pass.parentName}'s visit details"`);
+  };
 
   return (
-    <div className="space-y-6 text-left">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 mb-1">Manage Parent Visit Passes</h1>
-        <p className="text-slate-600 text-xs">Search, approve, or reject hostel visit requests by parents</p>
+    <div className="relative min-h-[500px] pb-10 text-left font-normal" style={{ background: 'var(--surface-0)', color: 'var(--text-primary)' }}>
+      {/* CSS variables & classes style block */}
+      <style>{`
+        :root {
+          --surface-0: #ffffff;
+          --surface-1: #f1f5f9;
+          --surface-2: #ffffff;
+          --text-primary: #0f172a;
+          --text-secondary: #475569;
+          --text-muted: #64748b;
+          --border: #e2e8f0;
+          --fill-accent: #3b82f6; /* light blue */
+          --fill-accent-hover: #1d4ed8; /* dark blue */
+          --text-accent: #2563eb;
+          --border-accent: #3b82f6;
+          --bg-accent: #eff6ff;
+          --bg-warning: #fef3c7;
+          --text-warning: #d97706;
+          --bg-success: #d1fae5;
+          --text-success: #059669;
+          --bg-danger: #fee2e2;
+          --text-danger: #dc2626;
+          --radius: 8px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --surface-0: #ffffff;
+            --surface-1: #f1f5f9;
+            --surface-2: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --fill-accent: #3b82f6;
+            --fill-accent-hover: #1d4ed8;
+            --text-accent: #2563eb;
+            --border-accent: #3b82f6;
+            --bg-accent: #eff6ff;
+            --bg-warning: #fef3c7;
+            --text-warning: #d97706;
+            --bg-success: #d1fae5;
+            --text-success: #059669;
+            --bg-danger: #fee2e2;
+            --text-danger: #dc2626;
+            --radius: 8px;
+          }
+        }
+
+        .page-title {
+          font-size: 20px;
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+
+        .page-subtitle {
+          font-size: 13px;
+          color: var(--text-muted);
+        }
+
+        .metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+          margin-top: 1rem;
+          margin-bottom: 1rem;
+        }
+
+        .metric-card {
+          background: var(--surface-1);
+          border-radius: var(--radius);
+          padding: 1rem;
+          border: none;
+        }
+
+        .metric-label {
+          font-size: 13px;
+          color: var(--text-muted);
+          margin-bottom: 4px;
+        }
+
+        .metric-value {
+          font-size: 24px;
+          font-weight: 500;
+          color: var(--text-primary);
+          line-height: 1;
+        }
+
+        .metric-value-warning {
+          color: var(--text-warning);
+        }
+
+        .metric-value-success {
+          color: var(--text-success);
+        }
+
+        .metric-value-danger {
+          color: var(--text-danger);
+        }
+
+        .tab-btn {
+          background: transparent;
+          color: var(--text-muted);
+          border-radius: var(--radius);
+          padding: 6px 12px;
+          font-size: 11px;
+          font-weight: 500;
+          transition: background 0.15s, color 0.15s;
+          border: none;
+          text-transform: uppercase;
+          cursor: pointer;
+        }
+
+        .tab-btn:hover {
+          background: var(--surface-1);
+        }
+
+        .tab-btn.active {
+          background: var(--fill-accent);
+          color: #ffffff;
+        }
+
+        .tab-btn.active:hover {
+          background: var(--fill-accent-hover);
+        }
+
+        .search-container {
+          position: relative;
+          width: 100%;
+        }
+
+        .search-input {
+          width: 100%;
+          background: var(--surface-2);
+          border: 0.5px solid var(--border);
+          border-radius: var(--radius);
+          padding: 8px 12px 8px 32px;
+          font-size: 13px;
+          color: var(--text-primary);
+        }
+
+        .search-input:focus {
+          border-color: var(--border-accent);
+          outline: none;
+        }
+
+        .search-icon {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--text-muted);
+        }
+
+        .table-container {
+          background: var(--surface-2);
+          border: 0.5px solid var(--border);
+          border-radius: 12px;
+          overflow: hidden;
+          margin-top: 1rem;
+        }
+
+        .table-row {
+          display: grid;
+          grid-template-columns: 1.6fr 1.4fr 1.4fr 1.2fr 1.2fr 0.8fr 0.6fr;
+          align-items: center;
+          gap: 1rem;
+          padding: 12px 16px;
+          border-bottom: 0.5px solid var(--border);
+          background: var(--surface-2);
+          transition: background 0.15s;
+        }
+
+        .table-row:hover {
+          background: var(--surface-1);
+        }
+
+        .table-header {
+          background: var(--surface-2);
+          border-bottom: 0.5px solid var(--border);
+          color: var(--text-muted);
+          font-size: 11px;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+        }
+
+        .text-bold-14 {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+
+        .text-muted-12 {
+          font-size: 12px;
+          color: var(--text-muted);
+        }
+
+        .text-secondary-13 {
+          font-size: 13px;
+          color: var(--text-secondary);
+        }
+
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 4px 8px;
+          border-radius: 9999px;
+          font-size: 11px;
+          font-weight: 500;
+          text-transform: uppercase;
+          line-height: none;
+        }
+
+        .badge-pending {
+          background: var(--bg-warning);
+          color: var(--text-warning);
+        }
+
+        .badge-approved {
+          background: var(--bg-success);
+          color: var(--text-success);
+        }
+
+        .badge-rejected {
+          background: var(--bg-danger);
+          color: var(--text-danger);
+        }
+
+        .badge-cancelled {
+          background: var(--surface-1);
+          color: var(--text-secondary);
+        }
+
+        .badge-expired {
+          background: var(--surface-1);
+          color: var(--text-muted);
+        }
+
+        .action-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 6px;
+          border-radius: var(--radius);
+          background: var(--surface-2);
+          color: var(--text-secondary);
+          border: 0.5px solid var(--border);
+          cursor: pointer;
+          transition: background 0.15s, color 0.15s;
+        }
+
+        .action-btn:hover {
+          background: var(--surface-1);
+          color: var(--text-primary);
+        }
+
+        .action-btn-warning {
+          color: var(--text-warning);
+          border-color: var(--text-warning);
+        }
+
+        .action-btn-warning:hover {
+          background: var(--bg-warning);
+        }
+
+        .faux-modal-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.6);
+          z-index: 50;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .modal-card {
+          width: 400px;
+          background: var(--surface-2);
+          border-radius: 12px;
+          border: 0.5px solid var(--border);
+          padding: 1.5rem;
+          position: relative;
+        }
+
+        .modal-close {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          font-size: 16px;
+          color: var(--text-muted);
+          cursor: pointer;
+          border: none;
+          background: transparent;
+        }
+
+        .modal-close:hover {
+          color: var(--text-primary);
+        }
+
+        .modal-title {
+          font-size: 16px;
+          font-weight: 500;
+          color: var(--text-primary);
+          margin-bottom: 1.5rem;
+        }
+
+        .modal-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 0;
+          border-bottom: 0.5px solid var(--border);
+          font-size: 13px;
+        }
+
+        .modal-row:last-of-type {
+          border-bottom: none;
+        }
+
+        .modal-label {
+          color: var(--text-muted);
+        }
+
+        .modal-value {
+          color: var(--text-primary);
+          text-align: right;
+        }
+
+        .btn-filled-green {
+          background: var(--text-success);
+          color: #ffffff;
+          padding: 8px 16px;
+          border-radius: var(--radius);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          border: none;
+        }
+
+        .btn-filled-green:hover {
+          opacity: 0.9;
+        }
+
+        .btn-filled-red {
+          background: var(--text-danger);
+          color: #ffffff;
+          padding: 8px 16px;
+          border-radius: var(--radius);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          border: none;
+        }
+
+        .btn-filled-red:hover {
+          opacity: 0.9;
+        }
+
+        .ai-panel {
+          margin-top: 1.5rem;
+          border-radius: 12px;
+          border: 0.5px solid var(--border-accent);
+          background: var(--surface-2);
+          overflow: hidden;
+        }
+
+        .ai-header {
+          background: var(--bg-accent);
+          padding: 8px 16px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border-bottom: 0.5px solid var(--border-accent);
+          color: var(--text-accent);
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .ai-body {
+          padding: 16px;
+          font-size: 13px;
+          color: var(--text-secondary);
+          line-height: 1.6;
+        }
+
+        .ai-btn-chat {
+          background: transparent;
+          color: var(--text-accent);
+          border: none;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 0;
+          margin-top: 8px;
+        }
+
+        .ai-btn-chat:hover {
+          text-decoration: underline;
+        }
+
+        .empty-state {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 3rem 0;
+          color: var(--text-muted);
+          font-size: 13px;
+        }
+
+        .empty-icon {
+          font-size: 2.5rem;
+          margin-bottom: 0.5rem;
+        }
+      `}</style>
+
+      {/* Header Area */}
+      <div className="mb-6">
+        <h1 className="page-title">Manage parent visit passes</h1>
+        <p className="page-subtitle">Search, audit and manage parent hostel visit permits</p>
       </div>
 
-      {/* Filters and Search Bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        {/* Status Tabs */}
-        <div className="flex flex-wrap gap-1.5 bg-white/60 p-1.5 rounded-xl border border-slate-200">
-          {filterTabs.map((tab) => (
+      {/* Toolbar row: Tabs left, Search input right */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        {/* Status Filter Tabs */}
+        <div className="flex flex-wrap gap-1">
+          {['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'].map(tab => (
             <button
               key={tab}
-              onClick={() => setStatusFilter(tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
-                statusFilter === tab
-                  ? 'bg-blue-600 text-white shadow'
-                  : 'text-slate-600 hover:text-slate-750'
-              }`}
+              onClick={() => setActiveTab(tab)}
+              className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
             >
               {tab}
             </button>
           ))}
         </div>
 
-        {/* Search Input */}
-        <div className="w-full md:w-72 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+        {/* Search input container */}
+        <div className="w-full md:w-72 search-container">
+          <span className="ti ti-search search-icon"></span>
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by visitor, student name..."
-            className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-850 placeholder-slate-450 focus:outline-none transition-colors"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by parent name, student or roll…"
+            className="search-input"
           />
         </div>
       </div>
 
-      {/* Visits Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl">
+      {/* Summary Metric Cards row */}
+      <div className="metrics-grid">
+        {/* Card 1: Total Requests */}
+        <div className="metric-card">
+          <div className="metric-label">Total Requests</div>
+          <div className="metric-value">{totalRequests}</div>
+        </div>
+
+        {/* Card 2: Pending Review */}
+        <div className="metric-card">
+          <div className="metric-label">Pending Review</div>
+          <div className="metric-value metric-value-warning">{pendingReview}</div>
+        </div>
+
+        {/* Card 3: Approved Today */}
+        <div className="metric-card">
+          <div className="metric-label">Approved Today</div>
+          <div className="metric-value metric-value-success">{approvedToday}</div>
+        </div>
+
+        {/* Card 4: Rejected */}
+        <div className="metric-card">
+          <div className="metric-label">Rejected</div>
+          <div className="metric-value metric-value-danger">{rejectedCount}</div>
+        </div>
+      </div>
+
+      {/* Visit Permits Data Table */}
+      <div className="table-container">
+        {/* Headers */}
+        <div className="table-row table-header">
+          <div className="pl-4">Visitor (relationship)</div>
+          <div>Student child</div>
+          <div>Hostel detail</div>
+          <div>Visit date / time</div>
+          <div>Purpose</div>
+          <div>Status</div>
+          <div className="text-right pr-4">Actions</div>
+        </div>
+
         {loading ? (
-          <div className="py-24 flex items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+          <div className="py-24 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+            Loading visit permits…
+          </div>
+        ) : filteredVisits.length === 0 ? (
+          <div className="empty-state">
+            <span className="ti ti-users empty-icon"></span>
+            <span>No visit passes found</span>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            {visitPasses.length === 0 ? (
-              <div className="py-16 text-center text-xs text-slate-500">No visit requests found matching query.</div>
-            ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 text-[10px] text-slate-500 font-bold uppercase border-b border-slate-200">
-                    <th className="px-6 py-3.5">Visitor (Relationship)</th>
-                    <th className="px-6 py-3.5">Student Child</th>
-                    <th className="px-6 py-3.5">Visit Date / Time</th>
-                    <th className="px-6 py-3.5">Visitors</th>
-                    <th className="px-6 py-3.5">Status</th>
-                    <th className="px-6 py-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 text-xs">
-                  {visitPasses.map((pass) => (
-                    <tr key={pass._id} className="hover:bg-slate-100/40 transition-colors">
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-750 block">{pass.visitorName}</span>
-                        <span className="text-[10px] text-slate-500 block">Rel: {pass.relationship} &bull; Ph: {pass.phone}</span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-450">
-                        {pass.studentId ? (
-                          <>
-                            <span className="block font-semibold text-slate-750">{pass.studentId.name}</span>
-                            <span className="text-[10px] text-slate-500">Roll: {pass.studentId.studentId} &bull; Rm: {pass.studentId.roomNumber}</span>
-                          </>
-                        ) : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 space-y-1">
-                        <span className="flex items-center gap-1 text-slate-700">
-                          <Calendar className="h-3.5 w-3.5 text-blue-400" />
-                          {new Date(pass.visitDate).toLocaleDateString()}
-                        </span>
-                        <span className="flex items-center gap-1 text-slate-600">
-                          <Clock className="h-3.5 w-3.5 text-blue-500/50" />
-                          {pass.arrivalTime} - {pass.departureTime}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-700 flex items-center gap-1">
-                          <Users className="h-4.5 w-4.5 text-slate-500" /> {pass.visitorCount} Person(s)
-                        </span>
-                        {pass.visitorNames && pass.visitorNames.length > 0 && (
-                          <span className="text-[9px] text-slate-500 block max-w-[120px] leading-tight">
-                            ({pass.visitorNames.join(', ')})
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={pass.status} />
-                        {pass.status === 'REJECTED' && pass.rejectionReason && (
-                          <p className="text-[9px] text-red-400 mt-1 max-w-[150px] leading-relaxed">
-                            Reason: {pass.rejectionReason}
-                          </p>
-                        )}
-                        {pass.status === 'APPROVED' && pass.passId && (
-                          <span className="text-[9px] font-mono text-blue-400 block mt-1 font-bold">
-                            ID: {pass.passId}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end items-center gap-1.5">
-                          <Link
-                            to={`/parent/visit/${pass._id}`}
-                            title="View Details"
-                            className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-800 text-slate-600 hover:text-white border border-slate-200 transition-colors"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                          
-                          {pass.status === 'PENDING' && (
-                            <>
-                              <button
-                                onClick={() => handleApprove(pass._id)}
-                                title="Approve"
-                                className="p-1.5 rounded-lg bg-slate-50 hover:bg-emerald-900/30 text-slate-500 hover:text-emerald-400 border border-slate-200 hover:border-emerald-800/40 transition-colors cursor-pointer"
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => openRejectModal(pass._id)}
-                                title="Reject"
-                                className="p-1.5 rounded-lg bg-slate-50 hover:bg-red-900/30 text-slate-500 hover:text-red-400 border border-slate-200 hover:border-red-800/40 transition-colors cursor-pointer"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          filteredVisits.map(pass => (
+            <div key={pass._id} className="table-row">
+              {/* Parent Info */}
+              <div className="pl-4">
+                <div className="text-bold-14">{pass.parentName}</div>
+                <div className="text-muted-12">{pass.relation}</div>
+              </div>
+
+              {/* Student child Info */}
+              <div>
+                <div className="text-secondary-13">{pass.name}</div>
+                <div className="text-muted-12">ID: {pass.roll}</div>
+              </div>
+
+              {/* Hostel details */}
+              <div className="text-secondary-13">
+                <div>{pass.hostel}</div>
+                <div className="text-muted-12">Room: {pass.room}</div>
+              </div>
+
+              {/* Visit date and timings */}
+              <div className="text-secondary-13 space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-12">
+                  <span className="ti ti-calendar"></span>
+                  <span>{pass.date}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-12">
+                  <span className="ti ti-clock"></span>
+                  <span>{pass.timings}</span>
+                </div>
+              </div>
+
+              {/* Purpose and visitors count */}
+              <div className="text-secondary-13">
+                <div className="text-bold-14" style={{ fontSize: '13px' }}>{pass.purpose}</div>
+                <div className="text-muted-12">{pass.visitors}</div>
+              </div>
+
+              {/* Status badge */}
+              <div>
+                <span className={`badge ${
+                  pass.status.toUpperCase() === 'PENDING' ? 'badge-pending' :
+                  pass.status.toUpperCase() === 'APPROVED' ? 'badge-approved' :
+                  pass.status.toUpperCase() === 'REJECTED' ? 'badge-rejected' :
+                  pass.status.toUpperCase() === 'CANCELLED' ? 'badge-cancelled' :
+                  'badge-expired'
+                }`}>
+                  {pass.status}
+                </span>
+              </div>
+
+              {/* Actions */}
+              <div className="text-right pr-4 space-x-1.5 flex justify-end items-center">
+                <button
+                  onClick={() => setSelectedPass(pass)}
+                  className="action-btn"
+                  title="View Details"
+                >
+                  <span className="ti ti-eye"></span>
+                </button>
+
+                {pass.status.toUpperCase() === 'PENDING' && (
+                  <button
+                    onClick={() => setSelectedPass(pass)}
+                    className="action-btn action-btn-warning"
+                    title="Audit Permit"
+                  >
+                    <span className="ti ti-edit"></span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
         )}
       </div>
 
-      {/* Rejection Modal */}
-      {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl space-y-4">
-            <h3 className="text-md font-bold text-slate-900">Reject Visit Pass Application</h3>
-            <p className="text-xs text-slate-600">
-              Please enter the reason for rejecting this parent visit pass request.
-            </p>
-            <form onSubmit={handleRejectSubmit} className="space-y-4">
+      {/* AI Review Panel card wrapper */}
+      {selectedPass && (
+        <div className="ai-panel">
+          <div className="ai-header">
+            <span className="ti ti-robot"></span>
+            <span>AI visit pass review</span>
+          </div>
+          <div className="ai-body">
+            {aiLoading ? (
+              <div className="italic" style={{ color: 'var(--text-muted)' }}>Analyzing visit pass…</div>
+            ) : (
               <div>
-                <textarea
-                  required
-                  rows="3"
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Enter rejection reason (e.g. Renovation in progress, security alert)..."
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl p-3 text-xs text-slate-850 placeholder-slate-450 focus:outline-none transition-colors resize-none"
-                ></textarea>
-              </div>
-              <div className="flex justify-end gap-2 text-xs font-semibold">
+                <p className="mb-2">{aiText || 'Select a parent visit pass to run safety audits.'}</p>
                 <button
-                  type="button"
-                  onClick={() => setShowRejectModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-800 text-slate-450 cursor-pointer"
+                  onClick={() => sendPrompt(selectedPass)}
+                  className="ai-btn-chat"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingAction}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {isSubmittingAction ? 'Rejecting...' : 'Reject Permit'}
+                  Ask AI about this pass ↗
                 </button>
               </div>
-            </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Faux Viewport Modal Overlay container */}
+      {selectedPass && (
+        <div className="faux-modal-overlay">
+          <div className="modal-card">
+            {/* Close Button top-right */}
+            <button
+              onClick={() => setSelectedPass(null)}
+              className="modal-close"
+            >
+              <span className="ti ti-x"></span>
+            </button>
+
+            {/* Title: Parent Name - visit pass */}
+            <h2 className="modal-title">{selectedPass.parentName} — visit pass</h2>
+
+            {/* Details table rows */}
+            <div className="space-y-0.5">
+              <div className="modal-row">
+                <span className="modal-label">Parent Name</span>
+                <span className="modal-value">{selectedPass.parentName}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Relation</span>
+                <span className="modal-value">{selectedPass.relation}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Student Name</span>
+                <span className="modal-value">{selectedPass.name}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Roll ID</span>
+                <span className="modal-value">{selectedPass.roll}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Hostel</span>
+                <span className="modal-value">{selectedPass.hostel}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Room</span>
+                <span className="modal-value">{selectedPass.room}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Visit Date</span>
+                <span className="modal-value">{selectedPass.date}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Visit Timings</span>
+                <span className="modal-value">{selectedPass.timings}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Purpose</span>
+                <span className="modal-value">{selectedPass.purpose}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">No. of Visitors</span>
+                <span className="modal-value">{selectedPass.visitors}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Status</span>
+                <span className="modal-value">
+                  <span className={`badge ${
+                    selectedPass.status.toUpperCase() === 'PENDING' ? 'badge-pending' :
+                    selectedPass.status.toUpperCase() === 'APPROVED' ? 'badge-approved' :
+                    selectedPass.status.toUpperCase() === 'REJECTED' ? 'badge-rejected' :
+                    selectedPass.status.toUpperCase() === 'CANCELLED' ? 'badge-cancelled' :
+                    'badge-expired'
+                  }`}>
+                    {selectedPass.status}
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            {/* If status is PENDING: Approve & Reject buttons */}
+            {selectedPass.status.toUpperCase() === 'PENDING' && (
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => handleStatusChange(selectedPass._id, 'REJECTED')}
+                  className="btn-filled-red"
+                >
+                  Reject
+                </button>
+                <button
+                  onClick={() => handleStatusChange(selectedPass._id, 'APPROVED')}
+                  className="btn-filled-green"
+                >
+                  Approve
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

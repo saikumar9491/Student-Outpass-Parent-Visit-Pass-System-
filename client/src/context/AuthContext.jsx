@@ -56,6 +56,7 @@ export const AuthProvider = ({ children }) => {
         email: userData.email,
         role: userData.role,
         phone: userData.phone,
+        image: userData.image || profile?.image || '',
         profile
       };
       
@@ -125,6 +126,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateProfileImage = async (base64Image) => {
+    try {
+      const res = await API.put('/auth/profile-image', { image: base64Image });
+      if (res.data.success) {
+        const updated = {
+          ...user,
+          image: res.data.image,
+          profile: user.profile ? { ...user.profile, image: res.data.image } : user.profile
+        };
+        setUser(updated);
+        localStorage.setItem('user', JSON.stringify(updated));
+        return { success: true, image: res.data.image };
+      }
+      return { success: false, message: res.data.message };
+    } catch (error) {
+      console.error('Failed to update profile image:', error);
+      return { success: false, message: error.response?.data?.message || 'Failed to update image' };
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -139,6 +160,7 @@ export const AuthProvider = ({ children }) => {
         login,
         registerStudent,
         registerParent,
+        updateProfileImage,
         logout,
         setUser
       }}

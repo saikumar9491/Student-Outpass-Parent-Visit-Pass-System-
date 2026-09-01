@@ -116,15 +116,31 @@ const requestVisitPass = async (req, res) => {
 // @access  Private (Parent)
 const getMyVisitRequests = async (req, res) => {
   try {
-    const parent = await Parent.findOne({ userId: req.user._id });
-    if (!parent) {
-      return res.status(404).json({ message: 'Parent profile not found' });
+    let query = {};
+    if (req.user.role === 'parent') {
+      const parent = await Parent.findOne({ userId: req.user._id });
+      if (!parent) {
+        return res.status(404).json({ message: 'Parent profile not found' });
+      }
+      query = { parentId: parent._id };
+    } else if (req.user.role === 'student') {
+      const student = await Student.findOne({ userId: req.user._id });
+      if (!student) {
+        return res.status(404).json({ message: 'Student profile not found' });
+      }
+      query = { studentId: student._id };
+    } else {
+      return res.status(403).json({ message: 'Not authorized for this resource' });
     }
 
-    const visitRequests = await VisitPass.find({ parentId: parent._id })
+    const visitRequests = await VisitPass.find(query)
       .populate({
         path: 'studentId',
         select: 'name studentId hostel roomNumber'
+      })
+      .populate({
+        path: 'parentId',
+        select: 'name parentId relationship phone'
       })
       .sort({ createdAt: -1 });
 

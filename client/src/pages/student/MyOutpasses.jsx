@@ -11,6 +11,16 @@ const MyOutpasses = () => {
   const [filter, setFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
 
+  const formatDate = (dateStr) => {
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return 'N/A';
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
   const fetchOutpasses = async () => {
     try {
       const res = await API.get('/outpasses/my');
@@ -119,11 +129,11 @@ const MyOutpasses = () => {
                     <td className="px-6 py-4 space-y-1">
                       <span className="flex items-center gap-1 text-slate-700">
                         <Calendar className="h-3.5 w-3.5 text-blue-400" />
-                        {new Date(pass.outingDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        {formatDate(pass.outingDate)}
                       </span>
                       <span className="flex items-center gap-1 text-slate-600">
                         <AlertCircle className="h-3.5 w-3.5 text-blue-500/60" />
-                        {new Date(pass.expectedReturnDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        {formatDate(pass.expectedReturnDate)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-450">{pass.purpose}</td>

@@ -165,11 +165,18 @@ const loginUser = async (req, res) => {
       }
       user = await User.findById(parentRecord.userId);
     } else {
-      user = await User.findOne({ email: loginIdentifier.toLowerCase() });
+      // Check if it matches a Student Roll ID
+      const studentRecord = await Student.findOne({ studentId: new RegExp(`^${loginIdentifier}$`, 'i') });
+      if (studentRecord) {
+        user = await User.findById(studentRecord.userId);
+      } else {
+        // Fallback to email
+        user = await User.findOne({ email: loginIdentifier.toLowerCase() });
+      }
     }
 
     if (!user) {
-      return res.status(401).json({ message: 'Invalid email, Parent ID or password' });
+      return res.status(401).json({ message: 'Invalid user ID, email, or password' });
     }
 
     if (user.role === 'admin') {
@@ -197,6 +204,7 @@ const loginUser = async (req, res) => {
       email: user.email,
       role: user.role,
       phone: user.phone,
+      image: user.image || profileDetails?.image || '',
       token: generateToken(user._id),
       profile: profileDetails
     });
@@ -239,6 +247,8 @@ const loginAdmin = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      phone: user.phone,
+      image: user.image || '',
       token: generateToken(user._id)
     });
   } catch (error) {
@@ -247,9 +257,45 @@ const loginAdmin = async (req, res) => {
   }
 };
 
+// @desc    Update user profile image
+// @route   PUT /api/auth/profile-image
+// @access  Private
+const updateProfileImage = async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ message: 'Image data is required' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.image = image;
+    await user.save();
+
+    if (user.role === 'student') {
+      await Student.findOneAndUpdate({ userId: user._id }, { image });
+    } else if (user.role === 'parent') {
+      await Parent.findOneAndUpdate({ userId: user._id }, { image });
+    }
+
+    res.json({
+      success: true,
+      message: 'Profile image updated successfully',
+      image: user.image
+    });
+  } catch (error) {
+    console.error('Update profile image error:', error);
+    res.status(500).json({ message: 'Server error updating profile image', error: error.message });
+  }
+};
+
 module.exports = {
   registerStudent,
   registerParent,
   loginUser,
-  loginAdmin
+  loginAdmin,
+  updateProfileImage
 };

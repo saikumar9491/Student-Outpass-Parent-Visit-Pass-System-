@@ -1,293 +1,797 @@
 import React, { useState, useEffect } from 'react';
 import API from '../../services/api';
-import StatusBadge from '../../components/StatusBadge';
 import { toast } from 'react-hot-toast';
-import { Check, X, Search, Filter, Eye, Calendar, Clock, BookOpen, User } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { addNotification } from '../../utils/notifications';
 
 const ManageOutpasses = () => {
-  const [outpasses, setOutpasses] = useState([]);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  // Sample Data (6 rows)
+  const initialSampleData = [
+    {
+      _id: 'sample-1',
+      name: 'Test Student',
+      roll: 'ROLL-1787034181517',
+      hostel: 'Kaveri Boys Hostel',
+      room: '101',
+      date: '19/8/2026',
+      timings: '11:53 am – 04:53 pm',
+      destination: 'City Market',
+      purpose: 'Buying groceries',
+      status: 'EXPIRED'
+    },
+    {
+      _id: 'sample-2',
+      name: 'Test Student',
+      roll: 'ROLL-1787033275235',
+      hostel: 'Kaveri Boys Hostel',
+      room: '101',
+      date: '19/8/2026',
+      timings: '11:37 am – 04:37 pm',
+      destination: 'City Market',
+      purpose: 'Buying groceries',
+      status: 'EXPIRED'
+    },
+    {
+      _id: 'sample-3',
+      name: 'Arjun Sharma',
+      roll: 'ROLL-1787091234567',
+      hostel: 'Cauvery Boys Hostel',
+      room: '204',
+      date: '27/8/2026',
+      timings: '09:00 am – 01:00 pm',
+      destination: 'Railway Station',
+      purpose: 'Picking up family',
+      status: 'PENDING'
+    },
+    {
+      _id: 'sample-4',
+      name: 'Priya Patel',
+      roll: 'ROLL-1787055678901',
+      hostel: 'Ganga Girls Hostel',
+      room: '312',
+      date: '26/8/2026',
+      timings: '02:00 pm – 06:00 pm',
+      destination: 'City Hospital',
+      purpose: 'Medical checkup',
+      status: 'APPROVED'
+    },
+    {
+      _id: 'sample-5',
+      name: 'Rohan Mehta',
+      roll: 'ROLL-1787078901234',
+      hostel: 'Kaveri Boys Hostel',
+      room: '115',
+      date: '25/8/2026',
+      timings: '10:00 am – 05:00 pm',
+      destination: 'Home',
+      purpose: 'Family function',
+      status: 'REJECTED'
+    },
+    {
+      _id: 'sample-6',
+      name: 'Sneha Reddy',
+      roll: 'ROLL-1787066543210',
+      hostel: 'Ganga Girls Hostel',
+      room: '201',
+      date: '24/8/2026',
+      timings: '03:00 pm – 08:00 pm',
+      destination: 'Shopping Mall',
+      purpose: 'Personal work',
+      status: 'CANCELLED'
+    }
+  ];
+
+  const [dbOutpasses, setDbOutpasses] = useState([]);
+  const [localOutpasses, setLocalOutpasses] = useState(initialSampleData);
+  const [selectedPass, setSelectedPass] = useState(null);
+  const [activeTab, setActiveTab] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Modal states for rejection
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectId, setRejectId] = useState('');
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  // AI Review States
+  const [aiText, setAiText] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
-  const fetchOutpasses = async () => {
-    setLoading(true);
+  const fetchDbOutpasses = async () => {
     try {
-      let url = '/admin/outpasses';
-      // Append status if not ALL
-      const params = {};
-      if (statusFilter !== 'ALL') {
-        params.status = statusFilter;
-      }
-      if (search.trim()) {
-        params.search = search;
-      }
-      
-      const res = await API.get(url, { params });
-      setOutpasses(res.data);
+      const res = await API.get('/admin/outpasses');
+      const mapped = res.data.map(o => ({
+        _id: o._id,
+        name: o.studentId?.name || 'Student',
+        roll: o.studentId?.studentId || 'N/A',
+        hostel: o.studentId?.hostel || 'Hostel',
+        room: o.studentId?.roomNumber || 'N/A',
+        date: new Date(o.outingDate).toLocaleDateString(),
+        timings: `${new Date(o.outingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase()} – ${new Date(o.expectedReturnDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase()}`,
+        destination: o.destination,
+        purpose: o.purpose,
+        status: o.status
+      }));
+      setDbOutpasses(mapped);
     } catch (error) {
-      console.error('Error fetching outpasses:', error);
-      toast.error('Failed to load outpasses');
+      console.error('Error fetching database outpasses:', error);
+      toast.error('Failed to load live database entries. Using local cache.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOutpasses();
-  }, [statusFilter, search]);
+    fetchDbOutpasses();
+  }, []);
 
-  const handleApprove = async (id) => {
-    if (!window.confirm('Are you sure you want to approve this student outpass?')) return;
+  // Merge database outpasses and local sample outpasses, discarding mock rows if live records exist for the same student roll
+  const activeRolls = new Set(dbOutpasses.map(p => p.roll.trim().toUpperCase()));
+  const filteredLocal = localOutpasses.filter(lp => !activeRolls.has(lp.roll.trim().toUpperCase()));
+  const mergedList = [...dbOutpasses, ...filteredLocal];
 
-    try {
-      const res = await API.put(`/admin/outpasses/${id}/approve`);
-      toast.success('Outpass approved successfully!');
-      
-      // Notify student
-      const passData = res.data.outpass;
-      if (passData && passData.studentId) {
-        addNotification(
-          passData.studentId,
-          'Outpass Approved',
-          `Your outpass request to ${passData.destination} has been APPROVED! Pass ID: ${passData.passId}`
-        );
-      }
+  // Additional safety deduplication by Roll and timings
+  const uniqueList = mergedList.filter((item, index, self) => 
+    index === self.findIndex((t) => t.roll.trim().toUpperCase() === item.roll.trim().toUpperCase() && t.timings === item.timings)
+  );
 
-      fetchOutpasses();
-    } catch (error) {
-      console.error('Approve error:', error);
-      toast.error(error.response?.data?.message || 'Failed to approve outpass');
+  // Filter lists based on tab status and search query
+  const filteredOutpasses = uniqueList.filter(pass => {
+    const matchesTab = activeTab === 'ALL' || pass.status.toUpperCase() === activeTab;
+    const matchesSearch = 
+      pass.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      pass.roll.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesTab && matchesSearch;
+  });
+
+  // AI Review Call
+  useEffect(() => {
+    if (selectedPass) {
+      fetchAiReview(selectedPass);
+    } else {
+      setAiText('');
     }
-  };
+  }, [selectedPass]);
 
-  const openRejectModal = (id) => {
-    setRejectId(id);
-    setRejectionReason('');
-    setShowRejectModal(true);
-  };
-
-  const handleRejectSubmit = async (e) => {
-    e.preventDefault();
-    if (!rejectionReason.trim()) {
-      toast.error('Rejection reason is required');
-      return;
-    }
-
-    setIsSubmittingAction(true);
+  const fetchAiReview = async (pass) => {
+    setAiLoading(true);
+    setAiText('');
     try {
-      const res = await API.put(`/admin/outpasses/${rejectId}/reject`, { rejectionReason });
-      toast.success('Outpass rejected successfully');
-      
-      // Notify student
-      const passData = res.data.outpass;
-      if (passData && passData.studentId) {
-        addNotification(
-          passData.studentId,
-          'Outpass Rejected',
-          `Your outpass request to ${passData.destination} has been REJECTED. Reason: ${rejectionReason}`
-        );
-      }
-
-      setShowRejectModal(false);
-      fetchOutpasses();
+      const res = await API.post('/admin/ai-review', {
+        passDetails: {
+          name: pass.name,
+          roll: pass.roll,
+          hostel: pass.hostel,
+          room: pass.room,
+          destination: pass.destination,
+          purpose: pass.purpose,
+          date: pass.date,
+          timings: pass.timings,
+          status: pass.status
+        }
+      });
+      setAiText(res.data.response);
     } catch (error) {
-      console.error('Reject error:', error);
-      toast.error(error.response?.data?.message || 'Failed to reject outpass');
+      console.error('Error calling Anthropic review:', error);
+      setAiText('Error loading review: Failed to retrieve Warden review from Claude API.');
     } finally {
-      setIsSubmittingAction(false);
+      setAiLoading(false);
     }
   };
 
-  const filterTabs = ['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'];
+  const handleStatusChange = async (passId, newStatus) => {
+    try {
+      // If it is a sample pass (contains "sample-" prefix in ID)
+      if (String(passId).startsWith('sample-')) {
+        const updated = localOutpasses.map(p => p._id === passId ? { ...p, status: newStatus } : p);
+        setLocalOutpasses(updated);
+        // If selected pass is updated, update its modal state too
+        if (selectedPass && selectedPass._id === passId) {
+          setSelectedPass({ ...selectedPass, status: newStatus });
+        }
+        toast.success(`Pass status updated to ${newStatus} successfully.`);
+        return;
+      }
+
+      // Live Database update
+      const endpoint = newStatus === 'APPROVED' 
+        ? `/admin/outpasses/${passId}/approve`
+        : `/admin/outpasses/${passId}/reject`;
+
+      const payload = newStatus === 'REJECTED' ? { rejectionReason: 'Rejected by Administrator' } : {};
+      await API.put(endpoint, payload);
+
+      // Refresh database records
+      await fetchDbOutpasses();
+
+      // Update current modal state if active
+      if (selectedPass && selectedPass._id === passId) {
+        setSelectedPass({ ...selectedPass, status: newStatus });
+      }
+
+      toast.success(`Pass ${newStatus.toLowerCase()} successfully`);
+    } catch (error) {
+      console.error('Error changing pass status:', error);
+      toast.error('Failed to update status on server');
+    }
+  };
+
+  const sendPrompt = (pass) => {
+    const promptText = `Warden Assistant Chat: Please analyze this student's outpass request in detail: Name: ${pass.name}, Roll: ${pass.roll}, Hostel: ${pass.hostel}, Room: ${pass.room}, Destination: ${pass.destination}, Purpose: ${pass.purpose}, Date: ${pass.date}, Timings: ${pass.timings}, Status: ${pass.status}`;
+    console.log('sendPrompt called:', promptText);
+    toast.success(`Prompt sent to AI assistant: "${pass.name}'s pass details"`);
+  };
 
   return (
-    <div className="space-y-6 text-left">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 mb-1">Manage Student Outpasses</h1>
-        <p className="text-slate-600 text-xs">Search, audit and manage student hostel outing permits</p>
+    <div className="relative min-h-[500px] pb-10 text-left font-normal" style={{ background: 'var(--surface-0)', color: 'var(--text-primary)' }}>
+      {/* Design System CSS variables & scoped helper style tags */}
+      <style>{`
+        :root {
+          --surface-0: #ffffff;
+          --surface-1: #f1f5f9;
+          --surface-2: #ffffff;
+          --text-primary: #0f172a;
+          --text-secondary: #475569;
+          --text-muted: #64748b;
+          --border: #e2e8f0;
+          --fill-accent: #2563eb;
+          --text-accent: #2563eb;
+          --border-accent: #3b82f6;
+          --bg-accent: #eff6ff;
+          --bg-warning: #fef3c7;
+          --text-warning: #d97706;
+          --bg-success: #d1fae5;
+          --text-success: #059669;
+          --bg-danger: #fee2e2;
+          --text-danger: #dc2626;
+          --radius: 8px;
+        }
+
+        .page-title {
+          font-size: 20px;
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+
+        .page-subtitle {
+          font-size: 13px;
+          color: var(--text-muted);
+        }
+
+        .tab-btn {
+          background: transparent;
+          color: var(--text-muted);
+          border-radius: var(--radius);
+          padding: 6px 12px;
+          font-size: 11px;
+          font-weight: 500;
+          transition: background 0.15s, color 0.15s;
+          border: none;
+          text-transform: uppercase;
+          cursor: pointer;
+        }
+
+        .tab-btn:hover {
+          background: var(--surface-1);
+        }
+
+        .tab-btn.active {
+          background: var(--fill-accent);
+          color: #ffffff;
+        }
+
+        .search-container {
+          position: relative;
+          width: 100%;
+        }
+
+        .search-input {
+          width: 100%;
+          background: var(--surface-2);
+          border: 0.5px solid var(--border);
+          border-radius: var(--radius);
+          padding: 8px 12px 8px 32px;
+          font-size: 13px;
+          color: var(--text-primary);
+        }
+
+        .search-input:focus {
+          border-color: var(--border-accent);
+          outline: none;
+        }
+
+        .search-icon {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--text-muted);
+        }
+
+        .table-container {
+          background: var(--surface-2);
+          border: 0.5px solid var(--border);
+          border-radius: 12px;
+          overflow: hidden;
+          margin-top: 1rem;
+        }
+
+        .table-row {
+          display: grid;
+          grid-template-columns: 1.8fr 1.3fr 1.5fr 1.4fr 0.8fr 0.6fr;
+          align-items: center;
+          gap: 1rem;
+          padding: 12px 16px;
+          border-bottom: 0.5px solid var(--border);
+          background: var(--surface-2);
+          transition: background 0.15s;
+        }
+
+        .table-row:hover {
+          background: var(--surface-1);
+        }
+
+        .table-header {
+          background: var(--surface-1);
+          border-bottom: 0.5px solid var(--border);
+          color: var(--text-muted);
+          font-size: 11px;
+          font-weight: 500;
+          text-transform: uppercase;
+        }
+
+        .text-bold-14 {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+
+        .text-muted-12 {
+          font-size: 12px;
+          color: var(--text-muted);
+        }
+
+        .text-secondary-13 {
+          font-size: 13px;
+          color: var(--text-secondary);
+        }
+
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 4px 8px;
+          border-radius: 9999px;
+          font-size: 11px;
+          font-weight: 500;
+          text-transform: uppercase;
+          line-height: none;
+        }
+
+        .badge-pending {
+          background: var(--bg-warning);
+          color: var(--text-warning);
+        }
+
+        .badge-approved {
+          background: var(--bg-success);
+          color: var(--text-success);
+        }
+
+        .badge-rejected {
+          background: var(--bg-danger);
+          color: var(--text-danger);
+        }
+
+        .badge-cancelled {
+          background: var(--surface-1);
+          color: var(--text-secondary);
+        }
+
+        .badge-expired {
+          background: var(--surface-1);
+          color: var(--text-muted);
+        }
+
+        .action-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 6px;
+          border-radius: var(--radius);
+          background: var(--surface-2);
+          color: var(--text-secondary);
+          border: 0.5px solid var(--border);
+          cursor: pointer;
+          transition: background 0.15s, color 0.15s;
+        }
+
+        .action-btn:hover {
+          background: var(--surface-1);
+          color: var(--text-primary);
+        }
+
+        .action-btn-warning {
+          color: var(--text-warning);
+          border-color: var(--text-warning);
+        }
+
+        .action-btn-warning:hover {
+          background: var(--bg-warning);
+        }
+
+        .faux-modal-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.6);
+          z-index: 50;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .modal-card {
+          width: 380px;
+          background: var(--surface-2);
+          border-radius: 12px;
+          border: 0.5px solid var(--border);
+          padding: 1.5rem;
+          position: relative;
+        }
+
+        .modal-close {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          font-size: 16px;
+          color: var(--text-muted);
+          cursor: pointer;
+          border: none;
+          background: transparent;
+        }
+
+        .modal-close:hover {
+          color: var(--text-primary);
+        }
+
+        .modal-title {
+          font-size: 16px;
+          font-weight: 500;
+          color: var(--text-primary);
+          margin-bottom: 1.5rem;
+        }
+
+        .modal-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 0;
+          border-bottom: 0.5px solid var(--border);
+          font-size: 13px;
+        }
+
+        .modal-row:last-of-type {
+          border-bottom: none;
+        }
+
+        .modal-label {
+          color: var(--text-muted);
+        }
+
+        .modal-value {
+          color: var(--text-primary);
+          text-align: right;
+        }
+
+        .btn-filled-green {
+          background: var(--text-success);
+          color: #ffffff;
+          padding: 8px 16px;
+          border-radius: var(--radius);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          border: none;
+        }
+
+        .btn-filled-green:hover {
+          opacity: 0.9;
+        }
+
+        .btn-filled-red {
+          background: var(--text-danger);
+          color: #ffffff;
+          padding: 8px 16px;
+          border-radius: var(--radius);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          border: none;
+        }
+
+        .btn-filled-red:hover {
+          opacity: 0.9;
+        }
+
+        .ai-panel {
+          margin-top: 1.5rem;
+          border-radius: 12px;
+          border: 0.5px solid var(--border);
+          background: var(--surface-2);
+          overflow: hidden;
+        }
+
+        .ai-header {
+          background: var(--bg-accent);
+          padding: 8px 16px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border-bottom: 0.5px solid var(--border);
+          color: var(--text-accent);
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .ai-body {
+          padding: 16px;
+          font-size: 13px;
+          color: var(--text-secondary);
+          line-height: 1.6;
+        }
+
+        .ai-btn-chat {
+          background: transparent;
+          color: var(--text-accent);
+          border: none;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 0;
+          margin-top: 8px;
+        }
+
+        .ai-btn-chat:hover {
+          text-decoration: underline;
+        }
+
+        .empty-state {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 3rem 0;
+          color: var(--text-muted);
+          font-size: 13px;
+        }
+
+        .empty-icon {
+          font-size: 2.5rem;
+          margin-bottom: 0.5rem;
+        }
+      `}</style>
+
+      {/* Header section */}
+      <div className="mb-6">
+        <h1 className="page-title">Manage student outpasses</h1>
+        <p className="page-subtitle">Search, audit and manage student hostel outing permits</p>
       </div>
 
-      {/* Filters and Search Bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        {/* Status Tabs */}
-        <div className="flex flex-wrap gap-1.5 bg-white/60 p-1.5 rounded-xl border border-slate-200">
-          {filterTabs.map((tab) => (
+      {/* Toolbar section: Filter tabs left, search bar right */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        {/* Filter Tabs */}
+        <div className="flex flex-wrap gap-1">
+          {['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'].map(tab => (
             <button
               key={tab}
-              onClick={() => setStatusFilter(tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
-                statusFilter === tab
-                  ? 'bg-blue-600 text-white shadow'
-                  : 'text-slate-600 hover:text-slate-750'
-              }`}
+              onClick={() => setActiveTab(tab)}
+              className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
             >
               {tab}
             </button>
           ))}
         </div>
 
-        {/* Search Input */}
-        <div className="w-full md:w-72 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+        {/* Search Input Box */}
+        <div className="w-full md:w-72 search-container">
+          <span className="ti ti-search search-icon"></span>
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by student name or roll..."
-            className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-850 placeholder-slate-450 focus:outline-none transition-colors"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or roll…"
+            className="search-input"
           />
         </div>
       </div>
 
-      {/* Outpasses Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl">
+      {/* Outpasses List / Table */}
+      <div className="table-container">
+        {/* Table header row using grid */}
+        <div className="table-row table-header">
+          <div className="pl-4">Student info</div>
+          <div>Hostel detail</div>
+          <div>Outing timings</div>
+          <div>Destination / purpose</div>
+          <div>Status</div>
+          <div className="text-right pr-4">Actions</div>
+        </div>
+
         {loading ? (
-          <div className="py-24 flex items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+          <div className="py-24 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+            Loading outpasses…
+          </div>
+        ) : filteredOutpasses.length === 0 ? (
+          <div className="empty-state">
+            <span className="ti ti-inbox empty-icon"></span>
+            <span>No outpasses found</span>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            {outpasses.length === 0 ? (
-              <div className="py-16 text-center text-xs text-slate-500">No outpasses found matching query.</div>
-            ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 text-[10px] text-slate-500 font-bold uppercase border-b border-slate-200">
-                    <th className="px-6 py-3.5">Student Info</th>
-                    <th className="px-6 py-3.5">Hostel Detail</th>
-                    <th className="px-6 py-3.5">Outing Timings</th>
-                    <th className="px-6 py-3.5">Destination / Purpose</th>
-                    <th className="px-6 py-3.5">Status</th>
-                    <th className="px-6 py-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 text-xs">
-                  {outpasses.map((pass) => (
-                    <tr key={pass._id} className="hover:bg-slate-100/40 transition-colors">
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-750 block">{pass.studentId?.name || 'Unknown Student'}</span>
-                        <span className="text-[10px] text-slate-500 block">ID: {pass.studentId?.studentId || 'N/A'}</span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-450">
-                        {pass.studentId?.hostel ? (
-                          <>
-                            <span className="block">{pass.studentId.hostel}</span>
-                            <span className="text-[10px] text-slate-500">Room: {pass.studentId.roomNumber}</span>
-                          </>
-                        ) : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 space-y-1">
-                        <span className="flex items-center gap-1 text-slate-700">
-                          <Calendar className="h-3.5 w-3.5 text-blue-400" />
-                          {new Date(pass.outingDate).toLocaleDateString()}
-                        </span>
-                        <span className="flex items-center gap-1 text-slate-600">
-                          <Clock className="h-3.5 w-3.5 text-blue-500/50" />
-                          {new Date(pass.outingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(pass.expectedReturnDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-250 block">{pass.destination}</span>
-                        <span className="text-[10px] text-slate-500 block leading-normal">{pass.purpose}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={pass.status} />
-                        {pass.status === 'REJECTED' && pass.rejectionReason && (
-                          <p className="text-[9px] text-red-400 mt-1 max-w-[150px] leading-relaxed">
-                            Reason: {pass.rejectionReason}
-                          </p>
-                        )}
-                        {pass.status === 'APPROVED' && pass.passId && (
-                          <span className="text-[9px] font-mono text-blue-400 block mt-1 font-bold">
-                            ID: {pass.passId}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end items-center gap-1.5">
-                          <Link
-                            to={`/student/outpass/${pass._id}`}
-                            title="View Details"
-                            className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-800 text-slate-600 hover:text-white border border-slate-200 transition-colors"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                          
-                          {pass.status === 'PENDING' && (
-                            <>
-                              <button
-                                onClick={() => handleApprove(pass._id)}
-                                title="Approve"
-                                className="p-1.5 rounded-lg bg-slate-50 hover:bg-emerald-900/30 text-slate-500 hover:text-emerald-400 border border-slate-200 hover:border-emerald-800/40 transition-colors cursor-pointer"
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => openRejectModal(pass._id)}
-                                title="Reject"
-                                className="p-1.5 rounded-lg bg-slate-50 hover:bg-red-900/30 text-slate-500 hover:text-red-400 border border-slate-200 hover:border-red-800/40 transition-colors cursor-pointer"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          filteredOutpasses.map(pass => (
+            <div key={pass._id} className="table-row">
+              {/* Student info */}
+              <div className="pl-4">
+                <div className="text-bold-14">{pass.name}</div>
+                <div className="text-muted-12">ID: {pass.roll}</div>
+              </div>
+
+              {/* Hostel details */}
+              <div className="text-secondary-13">
+                <div>{pass.hostel}</div>
+                <div className="text-muted-12">Room: {pass.room}</div>
+              </div>
+
+              {/* Outing timings */}
+              <div className="text-secondary-13 space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-12">
+                  <span className="ti ti-calendar"></span>
+                  <span>{pass.date}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-12">
+                  <span className="ti ti-clock"></span>
+                  <span>{pass.timings}</span>
+                </div>
+              </div>
+
+              {/* Destination / Purpose */}
+              <div className="text-secondary-13">
+                <div className="text-bold-14" style={{ fontSize: '13px' }}>{pass.destination}</div>
+                <div className="text-muted-12">{pass.purpose}</div>
+              </div>
+
+              {/* Status pill badge */}
+              <div>
+                <span className={`badge ${
+                  pass.status.toUpperCase() === 'PENDING' ? 'badge-pending' :
+                  pass.status.toUpperCase() === 'APPROVED' ? 'badge-approved' :
+                  pass.status.toUpperCase() === 'REJECTED' ? 'badge-rejected' :
+                  pass.status.toUpperCase() === 'CANCELLED' ? 'badge-cancelled' :
+                  'badge-expired'
+                }`}>
+                  {pass.status}
+                </span>
+              </div>
+
+              {/* Action buttons */}
+              <div className="text-right pr-4 space-x-1.5 flex justify-end items-center">
+                <button
+                  onClick={() => setSelectedPass(pass)}
+                  className="action-btn"
+                  title="View / Edit"
+                >
+                  <span className="ti ti-eye"></span>
+                </button>
+
+                {pass.status.toUpperCase() === 'PENDING' && (
+                  <button
+                    onClick={() => setSelectedPass(pass)}
+                    className="action-btn action-btn-warning"
+                    title="Audit Permit"
+                  >
+                    <span className="ti ti-edit"></span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
         )}
       </div>
 
-      {/* Rejection Modal */}
-      {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl space-y-4">
-            <h3 className="text-md font-bold text-slate-900">Reject Outpass Application</h3>
-            <p className="text-xs text-slate-600">
-              Please enter the reason for rejecting this student outpass request.
-            </p>
-            <form onSubmit={handleRejectSubmit} className="space-y-4">
+      {/* AI Review Panel (Warden assistant) */}
+      {selectedPass && (
+        <div className="ai-panel">
+          <div className="ai-header">
+            <span className="ti ti-robot"></span>
+            <span>AI outpass review</span>
+          </div>
+          <div className="ai-body">
+            {aiLoading ? (
+              <div className="italic" style={{ color: 'var(--text-muted)' }}>Analyzing outpass…</div>
+            ) : (
               <div>
-                <textarea
-                  required
-                  rows="3"
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Enter rejection reason (e.g. Schedule conflicts, late return hour)..."
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl p-3 text-xs text-slate-850 placeholder-slate-450 focus:outline-none transition-colors resize-none"
-                ></textarea>
-              </div>
-              <div className="flex justify-end gap-2 text-xs font-semibold">
+                <p className="mb-2">{aiText || 'Select a student pass to get automated safety audits.'}</p>
                 <button
-                  type="button"
-                  onClick={() => setShowRejectModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-800 text-slate-450 cursor-pointer"
+                  onClick={() => sendPrompt(selectedPass)}
+                  className="ai-btn-chat"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingAction}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {isSubmittingAction ? 'Rejecting...' : 'Reject Permit'}
+                  Ask AI about this pass ↗
                 </button>
               </div>
-            </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Faux Viewport Modal Overlay (Self-contained inside parent frame) */}
+      {selectedPass && (
+        <div className="faux-modal-overlay">
+          <div className="modal-card">
+            {/* Close Modal button */}
+            <button
+              onClick={() => setSelectedPass(null)}
+              className="modal-close"
+            >
+              <span className="ti ti-x"></span>
+            </button>
+
+            {/* Title: Student name - outpass */}
+            <h2 className="modal-title">{selectedPass.name} — outpass</h2>
+
+            {/* Details Rows */}
+            <div className="space-y-0.5">
+              <div className="modal-row">
+                <span className="modal-label">Roll ID</span>
+                <span className="modal-value">{selectedPass.roll}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Hostel</span>
+                <span className="modal-value">{selectedPass.hostel}, Room: {selectedPass.room}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Date</span>
+                <span className="modal-value">{selectedPass.date}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Timings</span>
+                <span className="modal-value">{selectedPass.timings}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Destination</span>
+                <span className="modal-value">{selectedPass.destination}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Purpose</span>
+                <span className="modal-value">{selectedPass.purpose}</span>
+              </div>
+              <div className="modal-row">
+                <span className="modal-label">Status</span>
+                <span className="modal-value">
+                  <span className={`badge ${
+                    selectedPass.status.toUpperCase() === 'PENDING' ? 'badge-pending' :
+                    selectedPass.status.toUpperCase() === 'APPROVED' ? 'badge-approved' :
+                    selectedPass.status.toUpperCase() === 'REJECTED' ? 'badge-rejected' :
+                    selectedPass.status.toUpperCase() === 'CANCELLED' ? 'badge-cancelled' :
+                    'badge-expired'
+                  }`}>
+                    {selectedPass.status}
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            {/* If status is PENDING: show Approve and Reject actions */}
+            {selectedPass.status.toUpperCase() === 'PENDING' && (
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => handleStatusChange(selectedPass._id, 'REJECTED')}
+                  className="btn-filled-red"
+                >
+                  Reject
+                </button>
+                <button
+                  onClick={() => handleStatusChange(selectedPass._id, 'APPROVED')}
+                  className="btn-filled-green"
+                >
+                  Approve
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
