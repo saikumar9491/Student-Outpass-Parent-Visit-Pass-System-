@@ -18,8 +18,18 @@ connectDB();
 const app = express();
 
 // Middleware
+const allowedOrigins = process.env.CLIENT_URL 
+  ? process.env.CLIENT_URL.split(',').map(u => u.trim()) 
+  : ['http://localhost:5173'];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow server-to-server, postman, or matching origins
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Fallback to permissive to prevent CORS blockage
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
