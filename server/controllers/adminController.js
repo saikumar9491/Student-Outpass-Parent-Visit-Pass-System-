@@ -358,8 +358,18 @@ const getUsersList = async (req, res) => {
     const students = await Student.find({}).populate({ path: 'userId', select: 'createdAt' });
     const parents = await Parent.find({}).populate({ path: 'userId', select: 'createdAt' });
     
+    // Attach linked parent profiles directly to each student
+    const studentsWithParents = students.map(student => {
+      const studentObj = student.toObject();
+      const linkedParents = parents.filter(p => 
+        p.studentIds && p.studentIds.some(sid => sid.toString() === student._id.toString())
+      );
+      studentObj.parents = linkedParents;
+      return studentObj;
+    });
+
     res.json({
-      students,
+      students: studentsWithParents,
       parents
     });
   } catch (error) {
@@ -662,7 +672,8 @@ const updateStudentByAdmin = async (req, res) => {
     const studentIdParam = req.params.id;
     const { 
       name, email, phone, studentId, department, year, hostel, roomNumber,
-      studentImage
+      studentImage,
+      parentName, parentEmail, parentPhone, parentRelationship, parentImage, parentPassword
     } = req.body;
 
     if (!name || !email || !phone || !studentId || !department || !year || !hostel || !roomNumber) {
@@ -706,7 +717,59 @@ const updateStudentByAdmin = async (req, res) => {
     }
     await student.save();
 
-    res.json({ message: 'Student details updated successfully', student });
+    // Synchronize parent info if provided
+    if (parentName && parentEmail && parentPhone && parentRelationship) {
+      const existingParent = await Parent.findOne({ studentIds: student._id });
+      if (existingParent) {
+        existingParent.name = parentName;
+        existingParent.email = parentEmail.toLowerCase();
+        existingParent.phone = parentPhone;
+        existingParent.relationship = parentRelationship;
+        if (parentImage !== undefined) existingParent.image = parentImage;
+        await existingParent.save();
+
+        await User.findByIdAndUpdate(existingParent.userId, {
+          name: parentName,
+          email: parentEmail.toLowerCase(),
+          phone: parentPhone
+        });
+      } else if (parentPassword) {
+        let parentId = '';
+        let parentIdExists = true;
+        while (parentIdExists) {
+          const randNum = Math.floor(100000 + Math.random() * 900000);
+          parentId = `PAR-${randNum}`;
+          const existing = await Parent.findOne({ parentId });
+          if (!existing) parentIdExists = false;
+        }
+
+        const hashedParentPassword = await bcrypt.hash(parentPassword, 10);
+        const parentUser = await User.create({
+          name: parentName,
+          email: parentEmail.toLowerCase(),
+          password: hashedParentPassword,
+          phone: parentPhone,
+          role: 'parent'
+        });
+
+        await Parent.create({
+          userId: parentUser._id,
+          parentId,
+          needsPasswordChange: true,
+          name: parentName,
+          email: parentEmail.toLowerCase(),
+          phone: parentPhone,
+          relationship: parentRelationship,
+          studentIds: [student._id],
+          image: parentImage || ''
+        });
+
+        student.parentIds.push(parentUser._id);
+        await student.save();
+      }
+    }
+
+    res.json({ message: 'Student and linked parent details updated successfully', student });
   } catch (error) {
     console.error('Admin update student error:', error);
     res.status(500).json({ message: 'Server error during student update', error: error.message });

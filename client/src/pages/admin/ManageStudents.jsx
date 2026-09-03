@@ -3,7 +3,7 @@ import API from '../../services/api';
 import { toast } from 'react-hot-toast';
 import { 
   Search, Calendar, BookOpen, Home, Phone, Mail, UserPlus, 
-  Trash2, X, Edit, Users, Building, GraduationCap, Filter, Download
+  Trash2, X, Edit, Users, Building, GraduationCap, Eye, Shield, UserCheck
 } from 'lucide-react';
 import Loading from '../../components/Loading';
 
@@ -15,7 +15,7 @@ const ManageStudents = () => {
   const [selectedYear, setSelectedYear] = useState('ALL');
   const [selectedHostel, setSelectedHostel] = useState('ALL');
 
-  // Add Student Modal states
+  // Add / Edit Student Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState(null);
@@ -39,6 +39,9 @@ const ManageStudents = () => {
     parentImage: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // View Parent Modal state
+  const [viewingParent, setViewingParent] = useState(null);
 
   const handleFileChange = (e, fieldName) => {
     const file = e.target.files[0];
@@ -91,6 +94,9 @@ const ManageStudents = () => {
   const handleEditClick = (student) => {
     setIsEditMode(true);
     setEditingStudentId(student._id);
+
+    const linkedParent = (student.parents && student.parents[0]) || (student.parentIds && student.parentIds[0]) || {};
+
     setFormData({
       name: student.name || '',
       email: student.email || '',
@@ -101,14 +107,15 @@ const ManageStudents = () => {
       year: student.year || '1st Year',
       hostel: student.hostel || '',
       roomNumber: student.roomNumber || '',
-      parentName: '',
-      parentEmail: '',
-      parentPhone: '',
-      parentRelationship: 'Mother',
+      parentName: linkedParent.name || '',
+      parentEmail: linkedParent.email || '',
+      parentPhone: linkedParent.phone || '',
+      parentRelationship: linkedParent.relationship || 'Mother',
       parentPassword: '',
       studentImage: student.image || '',
-      parentImage: ''
+      parentImage: linkedParent.image || ''
     });
+
     const yrPrefix = student.studentId ? student.studentId.substring(1, 3) : '';
     const parsedYr = yrPrefix ? 2000 + Number(yrPrefix) : 2026;
     setAdmissionYear(parsedYr);
@@ -130,7 +137,7 @@ const ManageStudents = () => {
       setStudents(res.data.students || []);
     } catch (error) {
       console.error('Error fetching students:', error);
-      toast.error('Failed to load students list');
+      toast.error('Failed to load students directory');
     } finally {
       setLoading(false);
     }
@@ -149,7 +156,7 @@ const ManageStudents = () => {
     const { 
       name, email, password, phone, studentId, department, year, hostel, roomNumber,
       parentName, parentEmail, parentPhone, parentRelationship, parentPassword,
-      studentImage
+      studentImage, parentImage
     } = formData;
 
     if (isEditMode) {
@@ -177,12 +184,17 @@ const ManageStudents = () => {
           year,
           hostel,
           roomNumber,
-          studentImage
+          studentImage,
+          parentName,
+          parentEmail,
+          parentPhone,
+          parentRelationship,
+          parentImage
         });
-        toast.success('Student details updated successfully!');
+        toast.success('Student and linked parent updated successfully!');
       } else {
         await API.post('/admin/users/student', formData);
-        toast.success('Student and parent registered successfully!');
+        toast.success('Student & Parent registered successfully!');
       }
       setShowAddModal(false);
       fetchUsers();
@@ -195,13 +207,13 @@ const ManageStudents = () => {
   };
 
   const handleDelete = async (userId, studentName) => {
-    if (!window.confirm(`Are you sure you want to delete ${studentName}? This will permanently remove their credentials, student profile, outpass history, and parental links.`)) {
+    if (!window.confirm(`Are you sure you want to delete ${studentName}? This will permanently remove their credentials, student profile, outpass history, and linked parent associations.`)) {
       return;
     }
 
     try {
       await API.delete(`/admin/users/${userId}`);
-      toast.success('Student deleted successfully');
+      toast.success('Student and associated records removed successfully');
       fetchUsers();
     } catch (error) {
       console.error('Delete student error:', error);
@@ -214,13 +226,17 @@ const ManageStudents = () => {
   const hostels = Array.from(new Set(students.map(s => s.hostel).filter(Boolean)));
 
   const filteredStudents = students.filter(student => {
+    const parentObj = (student.parents && student.parents[0]) || (student.parentIds && student.parentIds[0]) || {};
     const matchesSearch = 
       student.name?.toLowerCase().includes(search.toLowerCase()) ||
       student.studentId?.toLowerCase().includes(search.toLowerCase()) ||
       student.hostel?.toLowerCase().includes(search.toLowerCase()) ||
       student.department?.toLowerCase().includes(search.toLowerCase()) ||
       student.email?.toLowerCase().includes(search.toLowerCase()) ||
-      student.phone?.toLowerCase().includes(search.toLowerCase());
+      student.phone?.toLowerCase().includes(search.toLowerCase()) ||
+      parentObj.name?.toLowerCase().includes(search.toLowerCase()) ||
+      parentObj.phone?.toLowerCase().includes(search.toLowerCase()) ||
+      parentObj.parentId?.toLowerCase().includes(search.toLowerCase());
 
     const matchesDept = selectedDept === 'ALL' || student.department === selectedDept;
     const matchesYear = selectedYear === 'ALL' || student.year === selectedYear;
@@ -237,20 +253,20 @@ const ManageStudents = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-slate-900 font-display">Students Directory</h1>
+            <h1 className="text-xl font-bold text-slate-900 font-display">Students & Guardians Directory</h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-              {students.length} Total Registered
+              {students.length} Total Enrolled
             </span>
           </div>
           <p className="text-slate-500 text-xs font-sans mt-0.5">
-            Manage student records, departmental allocations, hostel rooms, and linked parent profiles.
+            Manage student academic profiles, hostel wing allocations, and linked parent credentials in one place.
           </p>
         </div>
         <button
           onClick={openAddModal}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
         >
-          <UserPlus className="h-4 w-4" /> Register New Student
+          <UserPlus className="h-4 w-4" /> Register Student & Parent
         </button>
       </div>
 
@@ -264,13 +280,13 @@ const ManageStudents = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by student name, roll ID, email, phone, room..."
+              placeholder="Search by student name, roll ID, parent name, parent phone, room..."
               className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl py-2 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all"
             />
             {search && (
               <button 
                 onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
               >
                 Clear
               </button>
@@ -323,7 +339,7 @@ const ManageStudents = () => {
                   setSelectedHostel('ALL');
                   setSearch('');
                 }}
-                className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-2 py-1"
+                className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-2 py-1 cursor-pointer"
               >
                 Reset Filters
               </button>
@@ -344,7 +360,7 @@ const ManageStudents = () => {
                 <th className="py-3.5 px-4">Department & Year</th>
                 <th className="py-3.5 px-4">Hostel & Room</th>
                 <th className="py-3.5 px-4">Contact Info</th>
-                <th className="py-3.5 px-4">Linked Parent</th>
+                <th className="py-3.5 px-4">Linked Parent / Guardian</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -358,113 +374,133 @@ const ManageStudents = () => {
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student, index) => (
-                  <tr key={student._id} className="hover:bg-slate-50/70 transition-colors">
-                    {/* Index */}
-                    <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
-                      {index + 1}
-                    </td>
+                filteredStudents.map((student, index) => {
+                  const parentObj = (student.parents && student.parents[0]) || (student.parentIds && student.parentIds[0]) || null;
+                  return (
+                    <tr key={student._id} className="hover:bg-slate-50/70 transition-colors">
+                      {/* Index */}
+                      <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
+                        {index + 1}
+                      </td>
 
-                    {/* Student Info */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        {student.image ? (
-                          <img 
-                            src={student.image} 
-                            alt={student.name} 
-                            className="h-9 w-9 rounded-full object-cover border border-slate-200 shrink-0" 
-                          />
-                        ) : (
-                          <div className="h-9 w-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-200">
-                            {student.name ? student.name.charAt(0).toUpperCase() : 'S'}
+                      {/* Student Info */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          {student.image ? (
+                            <img 
+                              src={student.image} 
+                              alt={student.name} 
+                              className="h-9 w-9 rounded-full object-cover border border-slate-200 shrink-0" 
+                            />
+                          ) : (
+                            <div className="h-9 w-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-200">
+                              {student.name ? student.name.charAt(0).toUpperCase() : 'S'}
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-bold text-slate-900 text-xs">{student.name}</p>
+                            <p className="text-[10px] text-slate-400">
+                              Joined: {student.userId?.createdAt ? new Date(student.userId.createdAt).toLocaleDateString() : 'Active'}
+                            </p>
                           </div>
-                        )}
-                        <div>
-                          <p className="font-bold text-slate-900 text-xs">{student.name}</p>
-                          <p className="text-[10px] text-slate-400">
-                            Joined: {student.userId?.createdAt ? new Date(student.userId.createdAt).toLocaleDateString() : 'Active'}
+                        </div>
+                      </td>
+
+                      {/* Roll ID */}
+                      <td className="py-3.5 px-4 font-mono font-bold text-blue-600 text-[11px]">
+                        {student.studentId}
+                      </td>
+
+                      {/* Department & Year */}
+                      <td className="py-3.5 px-4">
+                        <p className="font-medium text-slate-800 text-xs">{student.department || 'General'}</p>
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                          {student.year || '1st Year'}
+                        </span>
+                      </td>
+
+                      {/* Hostel & Room */}
+                      <td className="py-3.5 px-4">
+                        <p className="font-medium text-slate-800 text-xs flex items-center gap-1.5">
+                          <Home className="h-3.5 w-3.5 text-slate-400" />
+                          {student.hostel || 'Main Block'}
+                        </p>
+                        <span className="inline-block mt-1 text-[11px] font-mono text-slate-500">
+                          Room <strong className="text-slate-800 font-semibold">{student.roomNumber || 'N/A'}</strong>
+                        </span>
+                      </td>
+
+                      {/* Contact Info */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-1">
+                          <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                            <Mail className="h-3 w-3 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[150px]">{student.email}</span>
+                          </p>
+                          <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                            <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                            <span>{student.phone}</span>
                           </p>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Roll ID */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-blue-600 text-[11px]">
-                      {student.studentId}
-                    </td>
+                      {/* Linked Parent / Guardian */}
+                      <td className="py-3.5 px-4">
+                        {parentObj && parentObj.name ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <UserCheck className="h-3 w-3 text-emerald-600" />
+                                {parentObj.relationship || 'Guardian'}: {parentObj.name}
+                              </span>
+                              <button
+                                onClick={() => setViewingParent({ ...parentObj, studentName: student.name, studentId: student.studentId })}
+                                className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold hover:underline cursor-pointer"
+                              >
+                                View ID
+                              </button>
+                            </div>
+                            {parentObj.phone && (
+                              <p className="text-[10px] text-slate-500 font-mono pl-0.5">📞 {parentObj.phone}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                            <span>No parent linked</span>
+                            <button
+                              onClick={() => handleEditClick(student)}
+                              className="text-blue-600 text-[10px] font-semibold hover:underline cursor-pointer"
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        )}
+                      </td>
 
-                    {/* Department & Year */}
-                    <td className="py-3.5 px-4">
-                      <p className="font-medium text-slate-800 text-xs">{student.department || 'General'}</p>
-                      <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                        {student.year || '1st Year'}
-                      </span>
-                    </td>
-
-                    {/* Hostel & Room */}
-                    <td className="py-3.5 px-4">
-                      <p className="font-medium text-slate-800 text-xs flex items-center gap-1.5">
-                        <Home className="h-3.5 w-3.5 text-slate-400" />
-                        {student.hostel || 'Main Block'}
-                      </p>
-                      <span className="inline-block mt-1 text-[11px] font-mono text-slate-500">
-                        Room <strong className="text-slate-800 font-semibold">{student.roomNumber || 'N/A'}</strong>
-                      </span>
-                    </td>
-
-                    {/* Contact Info */}
-                    <td className="py-3.5 px-4">
-                      <div className="space-y-1">
-                        <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
-                          <Mail className="h-3 w-3 text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[160px]">{student.email}</span>
-                        </p>
-                        <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
-                          <Phone className="h-3 w-3 text-slate-400 shrink-0" />
-                          <span>{student.phone}</span>
-                        </p>
-                      </div>
-                    </td>
-
-                    {/* Linked Parent */}
-                    <td className="py-3.5 px-4">
-                      {student.parentIds && student.parentIds.length > 0 ? (
-                        <div className="space-y-0.5">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {student.parentIds[0]?.relationship || 'Parent'}: {student.parentIds[0]?.name || 'Linked'}
-                          </span>
-                          {student.parentIds[0]?.phone && (
-                            <p className="text-[10px] text-slate-400 pl-1">{student.parentIds[0].phone}</p>
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleEditClick(student)}
+                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Student & Parent"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          {student.userId?._id && (
+                            <button
+                              onClick={() => handleDelete(student.userId._id, student.name)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete Student"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-[11px] text-slate-400 italic">None linked</span>
-                      )}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => handleEditClick(student)}
-                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Edit Student"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        {student.userId?._id && (
-                          <button
-                            onClick={() => handleDelete(student.userId._id, student.name)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Delete Student"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -474,21 +510,84 @@ const ManageStudents = () => {
         <div className="p-4 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
           <span>
             Showing <strong className="text-slate-800 font-semibold">{filteredStudents.length}</strong> of{' '}
-            <strong className="text-slate-800 font-semibold">{students.length}</strong> students
+            <strong className="text-slate-800 font-semibold">{students.length}</strong> enrolled students
           </span>
           <span className="text-[11px] text-slate-400">
-            Click edit ✏️ to update student department, room, or picture.
+            Parent login credentials & contact numbers are integrated directly in student records.
           </span>
         </div>
       </div>
 
-      {/* Add / Edit Student Modal */}
+      {/* View Parent Details Modal */}
+      {viewingParent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Shield className="h-4 w-4 text-emerald-600" /> Parent / Guardian Account Info
+              </h3>
+              <button onClick={() => setViewingParent(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              {viewingParent.image ? (
+                <img src={viewingParent.image} alt={viewingParent.name} className="h-14 w-14 rounded-full object-cover border border-slate-200" />
+              ) : (
+                <div className="h-14 w-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg border border-emerald-200">
+                  {viewingParent.name ? viewingParent.name.charAt(0) : 'P'}
+                </div>
+              )}
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">{viewingParent.name}</h4>
+                <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  {viewingParent.relationship || 'Parent'}
+                </span>
+                {viewingParent.parentId && (
+                  <p className="text-[11px] text-blue-600 font-mono font-bold mt-1">ID: {viewingParent.parentId}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs text-slate-700 border-t border-slate-100 pt-3">
+              <div className="flex justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-400">Child / Student:</span>
+                <span className="font-semibold text-slate-800">{viewingParent.studentName} ({viewingParent.studentId})</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-400">Email Address:</span>
+                <span className="font-medium text-slate-800">{viewingParent.email || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-400">Phone Number:</span>
+                <span className="font-medium text-slate-800">{viewingParent.phone || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-400">Login Role:</span>
+                <span className="font-semibold text-emerald-600 uppercase text-[10px]">Verified Parent Account</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setViewingParent(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Student & Parent Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6 overflow-y-auto">
           <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl space-y-4 my-8">
             <div className="flex justify-between items-center border-b border-slate-200 pb-3">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <UserPlus className="h-5 w-5 text-blue-600" /> {isEditMode ? 'Edit Student Details' : 'Register Student & Parent Account'}
+                <UserPlus className="h-5 w-5 text-blue-600" /> {isEditMode ? 'Edit Student & Linked Guardian' : 'Register Student & Parent Account'}
               </h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="h-5 w-5" />
@@ -497,8 +596,8 @@ const ManageStudents = () => {
 
             <form onSubmit={handleAddSubmit} className="space-y-4 text-xs font-semibold text-slate-600">
               {/* SECTION 1: Student Details */}
-              <div className="border-b border-slate-200 pb-2">
-                <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider block mb-2">Student Information</span>
+              <div className="border-b border-slate-200 pb-3">
+                <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider block mb-2">1. Student Academic Profile</span>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Full Name</label>
@@ -553,7 +652,7 @@ const ManageStudents = () => {
                         value="••••••••"
                         className="w-full bg-slate-100 border border-slate-200 rounded-xl py-2 px-3 text-slate-400 focus:outline-none cursor-not-allowed"
                       />
-                      <span className="text-[8px] text-slate-400 block mt-1 font-normal leading-normal">
+                      <span className="text-[8px] text-slate-400 block mt-1 font-normal leading-normal font-normal">
                         Password can be updated by the student in their settings.
                       </span>
                     </div>
@@ -630,7 +729,7 @@ const ManageStudents = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 mt-3 mb-2">
+                <div className="grid grid-cols-3 gap-4 mt-3 mb-1">
                   <div>
                     <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Year of Study</label>
                     <select
@@ -674,105 +773,114 @@ const ManageStudents = () => {
                 </div>
               </div>
 
-              {/* SECTION 2: Parent Details */}
-              {!isEditMode && (
-                <div>
-                  <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block mb-2">Parent / Guardian Information (Login Setup)</span>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Name</label>
-                      <input
-                        type="text"
-                        name="parentName"
-                        required
-                        value={formData.parentName}
-                        onChange={handleChange}
-                        placeholder="Jane Doe"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Email</label>
-                      <input
-                        type="email"
-                        name="parentEmail"
-                        required
-                        value={formData.parentEmail}
-                        onChange={handleChange}
-                        placeholder="jane.doe@email.com"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
-                      />
-                    </div>
+              {/* SECTION 2: Linked Parent / Guardian Details */}
+              <div>
+                <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block mb-2">2. Linked Parent / Guardian Information</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent / Guardian Name</label>
+                    <input
+                      type="text"
+                      name="parentName"
+                      required
+                      value={formData.parentName}
+                      onChange={handleChange}
+                      placeholder="Jane Doe"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 mt-3">
-                    <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Phone</label>
-                      <input
-                        type="text"
-                        name="parentPhone"
-                        required
-                        value={formData.parentPhone}
-                        onChange={handleChange}
-                        placeholder="9876543211"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Relationship</label>
-                      <select
-                        name="parentRelationship"
-                        value={formData.parentRelationship}
-                        onChange={handleChange}
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors cursor-pointer"
-                      >
-                        <option value="Mother">Mother</option>
-                        <option value="Father">Father</option>
-                        <option value="Guardian">Guardian</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Password</label>
-                      <input
-                        type="text"
-                        name="parentPassword"
-                        required
-                        value={formData.parentPassword}
-                        onChange={handleChange}
-                        placeholder="e.g. 123456"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
-                      />
-                      <span className="text-[8px] text-slate-400 block mt-1 font-normal leading-normal">
-                        Parent can change this password after logging in.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mt-3">
-                    <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Profile Picture</label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleFileChange(e, 'parentImage')}
-                        className="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                      />
-                    </div>
-                    <div className="flex items-center gap-3 pt-2">
-                      {formData.parentImage ? (
-                        <img src={formData.parentImage} alt="Parent Preview" className="h-10 w-10 object-cover rounded-full border border-slate-200" />
-                      ) : (
-                        <div className="text-[10px] text-slate-400 italic">No parent photo uploaded</div>
-                      )}
-                    </div>
+                  <div>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Email</label>
+                    <input
+                      type="email"
+                      name="parentEmail"
+                      required
+                      value={formData.parentEmail}
+                      onChange={handleChange}
+                      placeholder="jane.doe@email.com"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
+                    />
                   </div>
                 </div>
-              )}
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                <div className="grid grid-cols-3 gap-4 mt-3">
+                  <div>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Phone Number</label>
+                    <input
+                      type="text"
+                      name="parentPhone"
+                      required
+                      value={formData.parentPhone}
+                      onChange={handleChange}
+                      placeholder="9876543211"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Relationship</label>
+                    <select
+                      name="parentRelationship"
+                      value={formData.parentRelationship}
+                      onChange={handleChange}
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors cursor-pointer"
+                    >
+                      <option value="Mother">Mother</option>
+                      <option value="Father">Father</option>
+                      <option value="Guardian">Guardian</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    {!isEditMode ? (
+                      <>
+                        <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Password</label>
+                        <input
+                          type="text"
+                          name="parentPassword"
+                          required
+                          value={formData.parentPassword}
+                          onChange={handleChange}
+                          placeholder="e.g. 123456"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Password</label>
+                        <input
+                          type="text"
+                          disabled
+                          value="••••••••"
+                          className="w-full bg-slate-100 border border-slate-200 rounded-xl py-2 px-3 text-slate-400 focus:outline-none cursor-not-allowed"
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <div>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Photo (Optional)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, 'parentImage')}
+                      className="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-[10px] file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    {formData.parentImage ? (
+                      <img src={formData.parentImage} alt="Parent Preview" className="h-10 w-10 object-cover rounded-full border border-slate-200" />
+                    ) : (
+                      <div className="text-[10px] text-slate-400 italic">No parent photo uploaded</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
@@ -785,7 +893,7 @@ const ManageStudents = () => {
                   disabled={isSubmitting}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer font-medium disabled:opacity-50"
                 >
-                  {isSubmitting ? (isEditMode ? 'Saving...' : 'Registering...') : (isEditMode ? 'Save Changes' : 'Register Student & Parent')}
+                  {isSubmitting ? (isEditMode ? 'Saving Changes...' : 'Registering Student & Parent...') : (isEditMode ? 'Save Changes' : 'Register Student & Parent')}
                 </button>
               </div>
             </form>
