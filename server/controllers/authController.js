@@ -144,50 +144,48 @@ const registerParent = async (req, res) => {
   }
 };
 
-// @desc    Login student/parent (Strictly via Assigned Student ID or Parent ID)
+// @desc    Universal Smart Login (Student, Parent, Admin / Staff)
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body; // 'email' holds the assigned Student Roll ID or Parent ID
+    const { email, password } = req.body; // Can be Student Roll ID, Parent ID, Admin ID, or Email
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Please enter your assigned ID and password' });
+      return res.status(400).json({ message: 'Please enter your User ID and password' });
     }
 
     const loginIdentifier = email.trim();
+    let user = null;
 
-    // Disallow email format for students and parents as requested
-    if (loginIdentifier.includes('@')) {
-      return res.status(400).json({ 
-        message: 'Email login is not permitted for students or parents. Please use your assigned University Roll ID (e.g. 12612345) or Parent ID (e.g. PAR-123456).' 
+    // 1. Check if Parent ID (starts with PAR-)
+    if (loginIdentifier.toUpperCase().startsWith('PAR-')) {
+      const parentRecord = await Parent.findOne({ parentId: loginIdentifier.toUpperCase() });
+      if (parentRecord) {
+        user = await User.findById(parentRecord.userId);
+      }
+    }
+
+    // 2. Check if Student Roll ID (e.g. 12612345 or alphanumeric roll)
+    if (!user) {
+      const studentRecord = await Student.findOne({ studentId: new RegExp(`^${loginIdentifier}$`, 'i') });
+      if (studentRecord) {
+        user = await User.findById(studentRecord.userId);
+      }
+    }
+
+    // 3. Check if Admin / Staff Phone / Numeric ID or Email
+    if (!user) {
+      user = await User.findOne({
+        $or: [
+          { email: loginIdentifier.toLowerCase() },
+          { phone: loginIdentifier }
+        ]
       });
     }
 
-    let user = null;
-
-    if (loginIdentifier.toUpperCase().startsWith('PAR-')) {
-      // Parent Login via Parent ID
-      const parentRecord = await Parent.findOne({ parentId: loginIdentifier.toUpperCase() });
-      if (!parentRecord) {
-        return res.status(401).json({ message: 'Invalid Parent ID or password' });
-      }
-      user = await User.findById(parentRecord.userId);
-    } else {
-      // Student Login via Student Roll ID
-      const studentRecord = await Student.findOne({ studentId: new RegExp(`^${loginIdentifier}$`, 'i') });
-      if (!studentRecord) {
-        return res.status(401).json({ message: 'Invalid Student Roll ID or password' });
-      }
-      user = await User.findById(studentRecord.userId);
-    }
-
     if (!user) {
-      return res.status(401).json({ message: 'User account not found' });
-    }
-
-    if (user.role === 'admin') {
-      return res.status(401).json({ message: 'Admin accounts must use the admin login portal' });
+      return res.status(401).json({ message: 'Invalid User ID, Roll Number, or password' });
     }
 
     if (user.status === 'suspended') {
@@ -196,11 +194,7 @@ const loginUser = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ 
-        message: loginIdentifier.toUpperCase().startsWith('PAR-') 
-          ? 'Invalid Parent ID or password' 
-          : 'Invalid Student Roll ID or password' 
-      });
+      return res.status(401).json({ message: 'Invalid User ID or password' });
     }
 
     let profileDetails = null;
@@ -224,7 +218,7 @@ const loginUser = async (req, res) => {
       profile: profileDetails
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Universal login error:', error);
     res.status(500).json({ message: 'Server error during login', error: error.message });
   }
 };
