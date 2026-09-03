@@ -123,14 +123,16 @@ const Sidebar = () => {
           </NavLink>
 
           <NavLink
-            to="/admin?tab=users-roles"
-            className={`flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-              location.search.includes('tab=users-roles')
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15 font-bold'
-                : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
-            }`}
+            to="/admin/users-roles"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                isActive || location.search.includes('tab=users-roles')
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15 font-bold'
+                  : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
+              }`
+            }
           >
-            <Users className="h-4 w-4" />
+            <Shield className="h-4 w-4" />
             <span>Users & Roles</span>
           </NavLink>
         </div>

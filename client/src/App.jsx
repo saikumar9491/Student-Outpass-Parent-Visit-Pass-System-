@@ -33,6 +33,7 @@ import ManageParents from './pages/admin/ManageParents';
 import VerifyPass from './pages/admin/VerifyPass';
 import ActivePasses from './pages/admin/ActivePasses';
 import HostelBlocks from './pages/admin/HostelBlocks';
+import UsersAndRoles from './pages/admin/UsersAndRoles';
 
 const DashboardLayout = ({ children }) => {
   return (
@@ -235,6 +236,16 @@ function App() {
                 <ProtectedRoute allowedRoles={['admin']}>
                   <DashboardLayout>
                     <HostelBlocks />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users-roles"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <DashboardLayout>
+                    <UsersAndRoles />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

@@ -791,6 +791,116 @@ const returnVisitPass = async (req, res) => {
   }
 };
 
+const getRolesAndUsers = async (req, res) => {
+  try {
+    const users = await User.find({}).select('-password').sort({ createdAt: -1 });
+    
+    // Count stats
+    const totalUsers = users.length;
+    const adminsCount = users.filter(u => u.role === 'admin').length;
+    const wardensCount = users.filter(u => u.role === 'warden').length;
+    const securityCount = users.filter(u => u.role === 'security').length;
+    const studentsCount = users.filter(u => u.role === 'student').length;
+    const parentsCount = users.filter(u => u.role === 'parent').length;
+    const activeUsers = users.filter(u => u.status !== 'suspended').length;
+    const suspendedUsers = users.filter(u => u.status === 'suspended').length;
+
+    res.json({
+      users,
+      metrics: {
+        totalUsers,
+        adminsCount,
+        wardensCount,
+        securityCount,
+        studentsCount,
+        parentsCount,
+        activeUsers,
+        suspendedUsers
+      }
+    });
+  } catch (error) {
+    console.error('Get roles and users error:', error);
+    res.status(500).json({ message: 'Server error retrieving system users and roles' });
+  }
+};
+
+const createStaffUser = async (req, res) => {
+  try {
+    const { name, email, password, phone, role, assignedBlock } = req.body;
+
+    if (!name || !email || !password || !phone || !role) {
+      return res.status(400).json({ message: 'Name, email, password, phone, and role are required' });
+    }
+
+    const emailExists = await User.findOne({ email: email.toLowerCase().trim() });
+    if (emailExists) {
+      return res.status(400).json({ message: 'User with this email already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password: hashedPassword,
+      phone: phone.trim(),
+      role,
+      assignedBlock: assignedBlock || '',
+      status: 'active'
+    });
+
+    res.status(201).json({
+      message: 'Staff user created successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        assignedBlock: user.assignedBlock,
+        status: user.status
+      }
+    });
+  } catch (error) {
+    console.error('Create staff user error:', error);
+    res.status(500).json({ message: 'Server error creating staff user', error: error.message });
+  }
+};
+
+const updateUserRoleAndStatus = async (req, res) => {
+  try {
+    const { role, status, name, phone, assignedBlock } = req.body;
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (name) user.name = name.trim();
+    if (phone) user.phone = phone.trim();
+    if (role) user.role = role;
+    if (status) user.status = status;
+    if (assignedBlock !== undefined) user.assignedBlock = assignedBlock;
+
+    await user.save();
+
+    res.json({
+      message: 'User details & permissions updated successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        assignedBlock: user.assignedBlock,
+        status: user.status
+      }
+    });
+  } catch (error) {
+    console.error('Update user role error:', error);
+    res.status(500).json({ message: 'Server error updating user role', error: error.message });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getAllOutpasses,
@@ -806,5 +916,8 @@ module.exports = {
   aiReviewOutpass,
   returnOutpass,
   returnVisitPass,
-  updateStudentByAdmin
+  updateStudentByAdmin,
+  getRolesAndUsers,
+  createStaffUser,
+  updateUserRoleAndStatus
 };

@@ -26,7 +26,17 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       required: true,
-      enum: ['student', 'parent', 'admin'],
+      enum: ['student', 'parent', 'admin', 'warden', 'security'],
+      default: 'student',
+    },
+    status: {
+      type: String,
+      enum: ['active', 'suspended', 'pending'],
+      default: 'active',
+    },
+    assignedBlock: {
+      type: String,
+      default: '',
     },
     image: {
       type: String,

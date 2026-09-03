@@ -21,10 +21,12 @@ const AdminDashboard = () => {
   const [manualPassId, setManualPassId] = useState('');
   const [renderError, setRenderError] = useState(null);
 
-  // Redirect to /admin/hostel-blocks if navigated via query param
+  // Redirect to /admin/hostel-blocks or /admin/users-roles if navigated via query param
   useEffect(() => {
     if (location.search.includes('tab=hostel-blocks')) {
       navigate('/admin/hostel-blocks', { replace: true });
+    } else if (location.search.includes('tab=users-roles')) {
+      navigate('/admin/users-roles', { replace: true });
     }
   }, [location, navigate]);
 
