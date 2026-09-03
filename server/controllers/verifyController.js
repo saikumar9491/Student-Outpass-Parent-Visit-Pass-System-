@@ -14,11 +14,30 @@ const verifyPass = async (req, res) => {
       return res.status(400).json({ status: 'NOT FOUND', message: 'Pass ID is required' });
     }
 
-    // 1. Search in Outpass
-    let outpass = await Outpass.findOne({ passId: passId.trim().toUpperCase() }).populate({
+    // 1. Search in Outpass by passId or _id
+    let outpass = await Outpass.findOne({
+      $or: [
+        { passId: passId.trim().toUpperCase() },
+        { passId: passId.trim() }
+      ]
+    }).populate({
       path: 'studentId',
-      select: 'name studentId department year hostel roomNumber'
+      select: 'name studentId department year hostel roomNumber phone'
     });
+
+    // If not found by passId, check if search term is a Student Roll ID
+    if (!outpass) {
+      const studentRecord = await Student.findOne({ studentId: new RegExp(`^${passId.trim()}$`, 'i') });
+      if (studentRecord) {
+        outpass = await Outpass.findOne({
+          studentId: studentRecord._id,
+          status: { $in: ['APPROVED', 'COMPLETED', 'PENDING'] }
+        }).sort({ createdAt: -1 }).populate({
+          path: 'studentId',
+          select: 'name studentId department year hostel roomNumber phone'
+        });
+      }
+    }
 
     if (outpass) {
       // Lazy check
@@ -27,11 +46,15 @@ const verifyPass = async (req, res) => {
       const statusMap = outpass.status === 'APPROVED' ? 'VALID' : outpass.status;
 
       return res.json({
+        _id: outpass._id,
         status: statusMap,
         passType: 'Student Outpass',
         passId: outpass.passId,
         name: outpass.studentId ? outpass.studentId.name : 'Unknown Student',
         studentId: outpass.studentId ? outpass.studentId.studentId : 'N/A',
+        department: outpass.studentId ? outpass.studentId.department : 'N/A',
+        year: outpass.studentId ? outpass.studentId.year : 'N/A',
+        phone: outpass.studentId ? outpass.studentId.phone : 'N/A',
         hostel: outpass.studentId ? outpass.studentId.hostel : 'N/A',
         roomNumber: outpass.studentId ? outpass.studentId.roomNumber : 'N/A',
         date: outpass.outingDate,
@@ -39,15 +62,34 @@ const verifyPass = async (req, res) => {
         destination: outpass.destination,
         purpose: outpass.purpose,
         emergencyContact: outpass.emergencyContact,
-        approvedAt: outpass.approvedAt
+        approvedAt: outpass.approvedAt,
+        rawStatus: outpass.status
       });
     }
 
     // 2. Search in VisitPass
-    let visitPass = await VisitPass.findOne({ passId: passId.trim().toUpperCase() }).populate({
+    let visitPass = await VisitPass.findOne({
+      $or: [
+        { passId: passId.trim().toUpperCase() },
+        { passId: passId.trim() }
+      ]
+    }).populate({
       path: 'studentId',
-      select: 'name studentId department year hostel roomNumber'
+      select: 'name studentId department year hostel roomNumber phone'
     });
+
+    if (!visitPass) {
+      const studentRecord = await Student.findOne({ studentId: new RegExp(`^${passId.trim()}$`, 'i') });
+      if (studentRecord) {
+        visitPass = await VisitPass.findOne({
+          studentId: studentRecord._id,
+          status: { $in: ['APPROVED', 'COMPLETED', 'PENDING'] }
+        }).sort({ createdAt: -1 }).populate({
+          path: 'studentId',
+          select: 'name studentId department year hostel roomNumber phone'
+        });
+      }
+    }
 
     if (visitPass) {
       // Lazy check
@@ -56,12 +98,15 @@ const verifyPass = async (req, res) => {
       const statusMap = visitPass.status === 'APPROVED' ? 'VALID' : visitPass.status;
 
       return res.json({
+        _id: visitPass._id,
         status: statusMap,
         passType: 'Parent Visit Pass',
         passId: visitPass.passId,
         name: visitPass.visitorName,
         studentId: visitPass.studentId ? visitPass.studentId.studentId : 'N/A',
         studentName: visitPass.studentId ? visitPass.studentId.name : 'N/A',
+        department: visitPass.studentId ? visitPass.studentId.department : 'N/A',
+        phone: visitPass.studentId ? visitPass.studentId.phone : 'N/A',
         hostel: visitPass.studentId ? visitPass.studentId.hostel : 'N/A',
         roomNumber: visitPass.studentId ? visitPass.studentId.roomNumber : 'N/A',
         date: visitPass.visitDate,
@@ -70,7 +115,8 @@ const verifyPass = async (req, res) => {
         visitorCount: visitPass.visitorCount,
         visitorNames: visitPass.visitorNames,
         purpose: visitPass.purpose,
-        approvedAt: visitPass.approvedAt
+        approvedAt: visitPass.approvedAt,
+        rawStatus: visitPass.status
       });
     }
 

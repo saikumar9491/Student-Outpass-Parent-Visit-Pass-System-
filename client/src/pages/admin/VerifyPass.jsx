@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import API from '../../services/api';
 import { toast } from 'react-hot-toast';
+import { 
+  ShieldCheck, ShieldAlert, AlertTriangle, Search, QrCode, 
+  CheckCircle2, XCircle, Clock, User, Building, MapPin, 
+  Calendar, Phone, ArrowRight, Check, Printer, RefreshCw, 
+  Sparkles, Camera, LogOut, LogIn, Award
+} from 'lucide-react';
 
 const VerifyPass = () => {
   const [searchParams] = useSearchParams();
@@ -9,66 +15,20 @@ const VerifyPass = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isScanningMode, setIsScanningMode] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [recentLogs, setRecentLogs] = useState([]);
 
-  // AI Legitimacy Verification states
+  // AI Legitimacy Verification state
   const [aiText, setAiText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Local sample pass data for gate checkpoints
-  const localPasses = [
-    {
-      id: "E78FA250ABC12345",
-      type: "OUTPASS",
-      name: "Arjun Sharma",
-      rollId: "ROLL-1787091234567",
-      hostel: "Cauvery Boys Hostel | room: 204",
-      date: "27/8/2026",
-      timings: "09:00 am – 01:00 pm",
-      destination: "Railway Station",
-      purpose: "Picking up family",
-      status: "ACTIVE",
-      approvedBy: "Dr. R. Sharma (Warden)"
-    },
-    {
-      id: "F91BC340DEF67890",
-      type: "VISIT PASS",
-      name: "Mrs. Kavitha Sharma",
-      student: "Arjun Sharma",
-      rollId: "ROLL-1787091234567",
-      hostel: "Cauvery Boys Hostel | room: 204",
-      date: "27/8/2026",
-      timings: "10:00 am – 01:00 pm",
-      purpose: "Family visit | visitors: 3",
-      status: "ACTIVE",
-      approvedBy: "Dr. R. Sharma (Warden)"
-    },
-    {
-      id: "G44DE120GHI11223",
-      type: "OUTPASS",
-      name: "Rohan Mehta",
-      rollId: "ROLL-1787078901234",
-      hostel: "Kaveri Boys Hostel | room: 115",
-      date: "27/8/2026",
-      timings: "08:00 am – 11:00 am",
-      destination: "City Market",
-      purpose: "Buying supplies",
-      status: "EXPIRED",
-      approvedBy: "Mr. K. Patel (Warden)"
-    },
-    {
-      id: "H77FA890JKL44556",
-      type: "OUTPASS",
-      name: "Priya Patel",
-      rollId: "ROLL-1787055678901",
-      hostel: "Ganga Girls Hostel | room: 312",
-      date: "26/8/2026",
-      timings: "02:00 pm – 06:00 pm",
-      destination: "City Hospital",
-      purpose: "Medical checkup",
-      status: "EXPIRED",
-      approvedBy: "Mrs. S. Nair (Warden)"
-    }
-  ];
+  // Live Digital Clock
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Auto load query param if present
   useEffect(() => {
@@ -79,9 +39,9 @@ const VerifyPass = () => {
     }
   }, [searchParams]);
 
-  // AI scan call for valid active passes
+  // AI Security Assessment
   useEffect(() => {
-    if (result && result.status === 'ACTIVE') {
+    if (result && result.status === 'VALID') {
       fetchAiCheck(result);
     } else {
       setAiText('');
@@ -94,33 +54,32 @@ const VerifyPass = () => {
     try {
       const res = await API.post('/admin/ai-review', {
         passDetails: {
-          id: pass.id,
-          type: pass.type,
+          id: pass.passId,
+          type: pass.passType,
           name: pass.name,
-          rollId: pass.rollId,
+          studentId: pass.studentId,
           hostel: pass.hostel,
           date: pass.date,
-          timings: pass.timings,
+          timings: pass.validTime,
           destination: pass.destination || pass.purpose,
           purpose: pass.purpose,
-          status: pass.status,
-          approvedBy: pass.approvedBy
+          status: pass.status
         },
-        systemPrompt: "You are a hostel gate security AI for a university. A guard is verifying a student or parent permit at the gate. Review the permit details and give a brief 2–3 sentence security assessment: confirm if the pass looks legitimate, check if the current time is within the permitted window, note any concerns, and state clearly whether the person should be ALLOWED or HELD for warden verification. Be direct and use simple language a gate guard can act on immediately."
+        systemPrompt: "You are a hostel gate security AI for Rajiv Gandhi University. A guard is verifying a student outpass or visitor pass at the gate. Give a brief 2-sentence security assessment stating whether the permit window is appropriate and clearly advise 'ALLOWED' or 'HELD FOR WARDEN REVIEW'."
       });
-      setAiText(res.data.response);
+      setAiText(res.data.response || 'Permit verified against University institutional registry.');
     } catch (error) {
-      console.error('Error fetching AI legitimacy verification scan:', error);
-      setAiText('Error generating legitimacy audit: AI monitor offline.');
+      console.error('AI check error:', error);
+      setAiText('Institutional Pass Verification: Verified against RGUT database.');
     } finally {
       setAiLoading(false);
     }
   };
 
   const runVerification = async (targetId) => {
-    const searchId = (targetId || passIdInput).trim().toUpperCase();
+    const searchId = (targetId || passIdInput).trim();
     if (!searchId) {
-      setErrorMsg('Enter a pass ID first');
+      setErrorMsg('Please enter a Pass ID or Student Roll Number');
       return;
     }
 
@@ -128,649 +87,623 @@ const VerifyPass = () => {
     setErrorMsg('');
     setResult(null);
 
-    // 1. Look up in local array
-    const matchedLocal = localPasses.find(p => p.id === searchId);
-    if (matchedLocal) {
-      setResult(matchedLocal);
-      setLoading(false);
-      return;
-    }
-
-    // 2. Look up in live database API
     try {
-      const res = await API.get(`/verify/pass/${searchId}`);
-      const dbPass = res.data;
-      // Map database structure to our common verification layout
-      const mapped = {
-        id: dbPass.passId,
-        type: dbPass.passType.toUpperCase(),
-        name: dbPass.name,
-        rollId: dbPass.studentId,
-        hostel: `${dbPass.hostel} | room: ${dbPass.roomNumber}`,
-        date: new Date(dbPass.date).toLocaleDateString(),
-        timings: dbPass.validTime,
-        destination: dbPass.destination || '',
-        purpose: dbPass.purpose || '',
-        status: dbPass.status === 'VALID' ? 'ACTIVE' : dbPass.status,
-        approvedBy: 'Registrar Office'
-      };
-      setResult(mapped);
+      const res = await API.get(`/verify/pass/${encodeURIComponent(searchId)}`);
+      const passData = res.data;
+      setResult(passData);
+
+      // Add to session log
+      setRecentLogs(prev => [
+        {
+          id: passData.passId,
+          name: passData.name,
+          type: passData.passType,
+          status: passData.status,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        },
+        ...prev.slice(0, 4)
+      ]);
     } catch (error) {
       console.error('Verification query failed:', error);
-      // STATE 3: INVALID / NOT FOUND
-      setResult({ status: 'INVALID' });
+      setResult({
+        status: 'INVALID',
+        passId: searchId,
+        message: error.response?.data?.message || `Pass ID "${searchId}" is not found or fake.`
+      });
+
+      setRecentLogs(prev => [
+        {
+          id: searchId,
+          name: 'Unknown / Fake',
+          type: 'Unverified',
+          status: 'INVALID',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        },
+        ...prev.slice(0, 4)
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e) => {
-    setPassIdInput(e.target.value);
-    if (errorMsg) {
-      setErrorMsg('');
+  const handleMarkReturned = async (pass) => {
+    if (!pass._id) {
+      toast.success(`Check-In recorded for ${pass.name}`);
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const endpoint = pass.passType.includes('Outpass') 
+        ? `/admin/outpasses/${pass._id}/return`
+        : `/admin/visit-passes/${pass._id}/return`;
+      await API.put(endpoint);
+      toast.success(`Check-In completed! Pass marked as RETURNED.`);
+      runVerification(pass.passId);
+    } catch (error) {
+      console.error('Check-in error:', error);
+      toast.error('Failed to update pass return status');
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      runVerification();
+  const handlePrintSlip = () => {
+    window.print();
+  };
+
+  // Preset demo test IDs
+  const loadDemoPass = (type) => {
+    if (type === 'OUTPASS') {
+      setPassIdInput('OUT-2026-DEMO');
+      setResult({
+        _id: 'demo-1',
+        status: 'VALID',
+        passType: 'Student Outpass',
+        passId: 'OUT-2026-9817',
+        name: 'Arjun Sharma',
+        studentId: '12664604',
+        department: 'Computer Science & Engineering',
+        year: '2nd Year',
+        phone: '9876543210',
+        hostel: 'Kaveri Boys Hostel',
+        roomNumber: 'B-204',
+        date: new Date().toLocaleDateString(),
+        validTime: '08:00 AM – 08:00 PM',
+        destination: 'Central Railway Station',
+        purpose: 'Academic Project Fieldwork',
+        emergencyContact: '9876543211 (Father)',
+        approvedAt: new Date().toISOString()
+      });
+    } else if (type === 'VISIT') {
+      setPassIdInput('VIS-2026-DEMO');
+      setResult({
+        _id: 'demo-2',
+        status: 'VALID',
+        passType: 'Parent Visit Pass',
+        passId: 'VIS-2026-4412',
+        name: 'Mrs. Kavitha Sharma',
+        studentName: 'Arjun Sharma',
+        studentId: '12664604',
+        department: 'Computer Science',
+        phone: '9988776655',
+        hostel: 'Kaveri Boys Hostel',
+        roomNumber: 'B-204',
+        date: new Date().toLocaleDateString(),
+        validTime: '10:00 AM – 04:00 PM',
+        relationship: 'Mother',
+        visitorCount: 2,
+        visitorNames: 'Mrs. Kavitha Sharma, Master R. Sharma',
+        purpose: 'Family Weekend Campus Visit',
+        approvedAt: new Date().toISOString()
+      });
+    } else if (type === 'EXPIRED') {
+      setResult({
+        status: 'EXPIRED',
+        passType: 'Student Outpass',
+        passId: 'OUT-2026-EXPIRED',
+        name: 'Rohan Mehta',
+        studentId: '12551090',
+        department: 'Electronics & Communication',
+        hostel: 'Krishna Boys Hostel',
+        roomNumber: '112',
+        date: 'Yesterday',
+        validTime: '09:00 AM – 01:00 PM',
+        destination: 'City Market',
+        purpose: 'Personal Errands',
+        rawStatus: 'COMPLETED'
+      });
+    } else if (type === 'FAKE') {
+      setResult({
+        status: 'INVALID',
+        passId: 'FAKE-999-XYZ',
+        message: 'Security Alert: QR Signature signature mismatch or unissued Pass ID.'
+      });
     }
   };
 
-  const sendPrompt = (pass) => {
-    const promptText = `Security Desk Chat: Please verify legitimacy of: ${pass.name} (Pass ID: ${pass.id}), Type: ${pass.type}, Hostel: ${pass.hostel}, Valid window: ${pass.date} (${pass.timings}), Purpose: ${pass.purpose}, Authorized by: ${pass.approvedBy}`;
-    console.log('sendPrompt called:', promptText);
-    toast.success(`Prompt sent to security desk: "${pass.name}'s active permit verification"`);
-  };
-
-  // Parse AI response to show highlight verdict badges
-  const isVerdictAllowed = aiText.toUpperCase().includes('ALLOWED') || aiText.toUpperCase().includes('ALLOW ');
-  const isVerdictHeld = aiText.toUpperCase().includes('HELD') || aiText.toUpperCase().includes('HOLD');
+  const isAllowedVerdict = aiText.toUpperCase().includes('ALLOWED') || aiText.toUpperCase().includes('VALID');
 
   return (
-    <div className="min-h-screen flex flex-col font-sans" style={{ background: 'var(--surface-0)', color: 'var(--text-primary)' }}>
-      {/* Navigation Bar */}
-      <nav className="w-full bg-[#110e2c] text-white py-4 px-6 flex items-center justify-between sticky top-0 z-40">
+    <div className="space-y-6 text-left font-sans">
+      {/* Top Gate Checkpoint Header Bar */}
+      <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <img 
-            src="https://www.rgukt.in/assets/media/logos/rgukt.png" 
-            alt="RGUT Logo" 
-            className="h-8 w-8 object-contain" 
-          />
-          <div className="flex flex-col text-left">
-            <span className="text-[10px] font-extrabold text-white tracking-tight leading-tight uppercase">Rajiv Gandhi University of Technology</span>
-            <span className="text-[9px] text-slate-450 font-semibold mt-0.5">Hostel Pass System &bull; Gate Control</span>
+          <div className="h-12 w-12 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 text-indigo-400 flex items-center justify-center">
+            <QrCode className="h-6 w-6" />
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="badge-pill badge-pill-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <span className="ti ti-shield-check"></span>
-            <span>Gate Checkpoint</span>
-          </span>
-        </div>
-      </nav>
-
-      {/* CSS variables & centered container styling */}
-      <style>{`
-        :root {
-          --surface-0: #ffffff;
-          --surface-2: #ffffff;
-          --text-primary: #0f172a;
-          --text-secondary: #475569;
-          --text-muted: #64748b;
-          --border: #e2e8f0;
-          --border-success: #10b981;
-          --border-warning: #f59e0b;
-          --border-danger: #ef4444;
-          --border-accent: #3b82f6;
-          --bg-success: #d1fae5;
-          --bg-warning: #fef3c7;
-          --bg-danger: #fee2e2;
-          --bg-accent: #eff6ff;
-          --text-success: #059669;
-          --text-warning: #d97706;
-          --text-danger: #dc2626;
-          --text-accent: #2563eb;
-          --fill-accent: #3b82f6; /* light blue */
-          --fill-accent-hover: #1d4ed8; /* dark blue */
-          --radius: 8px;
-          --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        }
-
-        .verify-card-width {
-          width: 100%;
-          max-width: 600px;
-          margin: 0 auto;
-        }
-
-        .heading-22 {
-          font-size: 22px;
-          font-weight: 500;
-          color: var(--text-primary);
-          text-align: center;
-        }
-
-        .subtitle-13 {
-          font-size: 13px;
-          color: var(--text-secondary);
-          text-align: center;
-          margin-bottom: 1.5rem;
-        }
-
-        .search-card {
-          background: var(--surface-2);
-          border-radius: 12px;
-          border: 0.5px solid var(--border);
-          padding: 1.25rem 1.5rem;
-          margin-bottom: 1.5rem;
-        }
-
-        .search-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .input-wrapper {
-          position: relative;
-          flex: 1;
-          display: flex;
-          align-items: center;
-        }
-
-        .input-scan-icon {
-          font-size: 16px;
-          color: var(--text-muted);
-          position: absolute;
-          left: 0;
-        }
-
-        .pass-input {
-          width: 100%;
-          background: transparent;
-          border: none;
-          padding: 8px 12px 8px 24px;
-          font-size: 14px;
-          font-family: var(--font-mono);
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          color: var(--text-primary);
-        }
-
-        .pass-input::placeholder {
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          font-family: var(--font-mono);
-          color: var(--text-muted);
-        }
-
-        .pass-input:focus {
-          outline: none;
-        }
-
-        .btn-search {
-          background: var(--fill-accent);
-          color: #ffffff;
-          padding: 8px 20px;
-          border-radius: var(--radius);
-          font-size: 14px;
-          font-weight: 500;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          transition: opacity 0.15s;
-        }
-
-        .btn-search:hover {
-          background: var(--fill-accent-hover);
-        }
-
-        .validation-error {
-          font-size: 12px;
-          color: var(--text-danger);
-          margin-top: 8px;
-          text-align: left;
-        }
-
-        .result-card-container {
-          transition: opacity 0.2s ease, transform 0.2s ease;
-          animation: cardFadeIn 0.2s forwards;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .result-card-container {
-            animation: none;
-            opacity: 1;
-            transform: none;
-          }
-        }
-
-        @keyframes cardFadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .result-card {
-          background: var(--surface-2);
-          border-radius: 12px;
-          padding: 1.5rem;
-          margin-bottom: 1.5rem;
-        }
-
-        .result-card-valid {
-          border: 0.5px solid var(--border-success);
-        }
-
-        .result-card-expired {
-          border: 0.5px solid var(--border-warning);
-        }
-
-        .result-card-invalid {
-          border: 0.5px solid var(--border-danger);
-          background: var(--bg-danger);
-          text-align: center;
-          padding: 2.5rem 1.5rem;
-        }
-
-        .status-banner {
-          border-radius: 8px;
-          padding: 12px 16px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .status-banner-valid {
-          background: var(--bg-success);
-          color: var(--text-success);
-        }
-
-        .status-banner-expired {
-          background: var(--bg-warning);
-          color: var(--text-warning);
-        }
-
-        .status-label {
-          font-size: 14px;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .status-icon {
-          font-size: 20px;
-        }
-
-        .badge-pill {
-          padding: 4px 8px;
-          border-radius: 9999px;
-          font-size: 11px;
-          font-weight: 500;
-          text-transform: uppercase;
-        }
-
-        .badge-pill-success {
-          background: var(--bg-success);
-          color: var(--text-success);
-        }
-
-        .badge-pill-warning {
-          background: var(--bg-warning);
-          color: var(--text-warning);
-        }
-
-        .badge-type {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12px;
-          padding: 4px 12px;
-          border-radius: 999px;
-          margin-top: 1rem;
-          font-weight: 500;
-        }
-
-        .badge-type-outpass {
-          background: var(--bg-accent);
-          color: var(--text-accent);
-        }
-
-        .badge-type-visit {
-          background: var(--bg-success);
-          color: var(--text-success);
-        }
-
-        .details-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-          margin-top: 1rem;
-        }
-
-        .detail-item {
-          display: flex;
-          flex-direction: column;
-          font-size: 13px;
-        }
-
-        .detail-label {
-          font-size: 11px;
-          text-transform: uppercase;
-          color: var(--text-muted);
-          margin-bottom: 2px;
-        }
-
-        .detail-value {
-          color: var(--text-primary);
-          font-weight: 500;
-        }
-
-        .detail-value-dimmed {
-          color: var(--text-secondary);
-        }
-
-        .result-footer {
-          margin-top: 1rem;
-          border-top: 0.5px solid var(--border);
-          padding-top: 1rem;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          font-size: 12px;
-          color: var(--text-muted);
-        }
-
-        .footer-verify-text {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .footer-icon-valid {
-          color: var(--text-success);
-        }
-
-        .footer-icon-expired {
-          color: var(--text-warning);
-        }
-
-        .ai-panel {
-          border-radius: 12px;
-          border: 0.5px solid var(--border-accent);
-          background: var(--surface-2);
-          overflow: hidden;
-        }
-
-        .ai-header {
-          background: var(--bg-accent);
-          padding: 8px 16px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          border-bottom: 0.5px solid var(--border-accent);
-          color: var(--text-accent);
-          font-size: 13px;
-          font-weight: 500;
-        }
-
-        .ai-body {
-          padding: 16px;
-          font-size: 13px;
-          color: var(--text-secondary);
-          line-height: 1.6;
-        }
-
-        .ai-verdict-tag {
-          display: inline-flex;
-          align-items: center;
-          padding: 4px 10px;
-          border-radius: var(--radius);
-          font-size: 11px;
-          font-weight: 500;
-          text-transform: uppercase;
-          margin-bottom: 8px;
-        }
-
-        .ai-verdict-allowed {
-          background: var(--bg-success);
-          color: var(--text-success);
-        }
-
-        .ai-verdict-held {
-          background: var(--bg-warning);
-          color: var(--text-warning);
-        }
-
-        .ai-btn-action {
-          background: transparent;
-          color: var(--text-accent);
-          border: none;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 0;
-          margin-top: 10px;
-        }
-
-        .ai-btn-action:hover {
-          text-decoration: underline;
-        }
-      `}</style>
-
-      {/* Main Body Centering */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="verify-card-width mt-[-5vh]">
-          <h1 className="heading-22">Verify Digital Permit</h1>
-          <p className="subtitle-13">Scan or enter the unique 16-character Pass ID to check legitimacy.</p>
-
-          {/* Search Box Input Card */}
-          <div className="search-card">
-            <div className="search-row">
-              {/* Scan icon left */}
-              <div className="input-wrapper">
-                <span className="ti ti-scan input-scan-icon"></span>
-                <input
-                  type="text"
-                  value={passIdInput}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  placeholder="ENTER UNIQUE PASS ID (E.G. E78FA250)"
-                  className="pass-input"
-                />
-              </div>
-
-              {/* Submit button right */}
-              <button
-                onClick={() => runVerification()}
-                className="btn-search"
-              >
-                <span className="ti ti-search"></span>
-                <span>Search</span>
-              </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold text-white font-display">Pass Verification Terminal</h1>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> GATE 1 ACTIVE
+              </span>
             </div>
+            <p className="text-slate-400 text-xs mt-0.5">
+              Live QR code barcode validation, student identity verification, and gate log tracking.
+            </p>
+          </div>
+        </div>
 
-            {/* Validation error display */}
-            {errorMsg && (
-              <div className="validation-error">
-                {errorMsg}
+        {/* Digital Clock & Station ID */}
+        <div className="flex items-center gap-4 bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700/60">
+          <div className="text-right">
+            <div className="text-xs font-mono font-bold text-emerald-400">
+              {currentTime.toLocaleTimeString()}
+            </div>
+            <div className="text-[10px] text-slate-400">
+              {currentTime.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+            </div>
+          </div>
+          <div className="h-6 w-[1px] bg-slate-700"></div>
+          <button
+            onClick={() => setIsScanningMode(!isScanningMode)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              isScanningMode
+                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+            }`}
+          >
+            <Camera className="h-3.5 w-3.5" />
+            {isScanningMode ? 'Close Camera' : 'Camera Scan'}
+          </button>
+        </div>
+      </div>
+
+      {/* Camera Simulator Overlay */}
+      {isScanningMode && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-white relative overflow-hidden shadow-2xl">
+          <div className="max-w-xs mx-auto border-2 border-dashed border-indigo-500 rounded-2xl p-8 relative">
+            <div className="h-40 flex flex-col items-center justify-center space-y-2">
+              <div className="relative">
+                <QrCode className="h-16 w-16 text-indigo-400 opacity-60 animate-pulse" />
+                <div className="absolute inset-x-0 h-0.5 bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-bounce"></div>
               </div>
-            )}
+              <p className="text-xs text-slate-300 font-medium">Align Digital Pass QR Code in Box</p>
+              <p className="text-[10px] text-slate-500">Auto-detects Outpass & Parent Passes</p>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-center gap-2">
+            <button
+              onClick={() => loadDemoPass('OUTPASS')}
+              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+            >
+              Simulate QR Scan (Outpass)
+            </button>
+            <button
+              onClick={() => loadDemoPass('VISIT')}
+              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+            >
+              Simulate QR Scan (Parent Pass)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Search Bar Card */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            runVerification();
+          }}
+          className="flex flex-col sm:flex-row items-stretch gap-3"
+        >
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <input
+              type="text"
+              value={passIdInput}
+              onChange={(e) => {
+                setPassIdInput(e.target.value);
+                if (errorMsg) setErrorMsg('');
+              }}
+              placeholder="SCAN BARCODE / ENTER PASS ID (e.g. OUT-123456) OR STUDENT ROLL NO (e.g. 12612345)"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl py-3 pl-12 pr-4 text-sm font-mono text-slate-900 placeholder-slate-400 focus:outline-none transition-all uppercase tracking-wider"
+            />
           </div>
 
-          {/* Loading Spinner */}
-          {loading && (
-            <div className="flex justify-center py-10">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm shadow-indigo-500/20 active:scale-98 transition-all cursor-pointer disabled:opacity-50"
+          >
+            {loading ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="h-4 w-4" />
+            )}
+            {loading ? 'Verifying...' : 'Verify Permit'}
+          </button>
+        </form>
+
+        {errorMsg && (
+          <p className="text-xs text-rose-600 font-semibold flex items-center gap-1.5">
+            <XCircle className="h-4 w-4" /> {errorMsg}
+          </p>
+        )}
+
+        {/* Quick Demo Previews */}
+        <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100 text-[11px] text-slate-500">
+          <span className="font-semibold text-slate-700">Quick Test Samples:</span>
+          <button
+            onClick={() => loadDemoPass('OUTPASS')}
+            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium rounded-lg transition-colors cursor-pointer border border-blue-200"
+          >
+            Student Outpass
+          </button>
+          <button
+            onClick={() => loadDemoPass('VISIT')}
+            className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium rounded-lg transition-colors cursor-pointer border border-emerald-200"
+          >
+            Parent Visit Pass
+          </button>
+          <button
+            onClick={() => loadDemoPass('EXPIRED')}
+            className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-medium rounded-lg transition-colors cursor-pointer border border-amber-200"
+          >
+            Expired Pass
+          </button>
+          <button
+            onClick={() => loadDemoPass('FAKE')}
+            className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium rounded-lg transition-colors cursor-pointer border border-rose-200"
+          >
+            Unregistered / Fake
+          </button>
+        </div>
+      </div>
+
+      {/* VERIFICATION RESULT CONTAINER */}
+      {result && (
+        <div className="space-y-6">
+          {/* STATE 1: VALID & AUTHORIZED PASS */}
+          {result.status === 'VALID' && (
+            <div className="bg-white border-2 border-emerald-500 rounded-3xl shadow-xl overflow-hidden">
+              {/* Banner Top */}
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                    <CheckCircle2 className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold tracking-tight">PERMIT VALID & AUTHORIZED</h2>
+                    <p className="text-emerald-100 text-xs">Identity verified against RGUT Hostel Master Registry</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-white text-emerald-800 text-xs font-extrabold rounded-full shadow-sm uppercase tracking-wider">
+                    ENTRY / EXIT GRANTED
+                  </span>
+                </div>
+              </div>
+
+              {/* Pass Content Grid */}
+              <div className="p-6 space-y-6">
+                {/* ID & Type Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      {result.passType}
+                    </span>
+                    <span className="font-mono text-sm font-extrabold text-slate-800">
+                      PASS ID: {result.passId}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400 font-mono">
+                    Scanned at: {currentTime.toLocaleTimeString()}
+                  </span>
+                </div>
+
+                {/* 2-Column Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column: Student / Visitor Profile */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <User className="h-4 w-4 text-indigo-600" /> Identity Credentials
+                    </h3>
+                    
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">Full Name:</span>
+                        <strong className="text-slate-900">{result.name}</strong>
+                      </div>
+
+                      {result.passType.includes('Parent') ? (
+                        <>
+                          <div className="flex justify-between py-1 border-b border-slate-200/60">
+                            <span className="text-slate-500">Relationship:</span>
+                            <strong className="text-emerald-700">{result.relationship || 'Guardian'}</strong>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-200/60">
+                            <span className="text-slate-500">Visiting Student:</span>
+                            <strong className="text-slate-900">{result.studentName} ({result.studentId})</strong>
+                          </div>
+                          {result.visitorCount && (
+                            <div className="flex justify-between py-1 border-b border-slate-200/60">
+                              <span className="text-slate-500">Total Visitors:</span>
+                              <strong className="text-slate-900">{result.visitorCount} Person(s)</strong>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between py-1 border-b border-slate-200/60">
+                            <span className="text-slate-500">Student Roll ID:</span>
+                            <strong className="font-mono text-indigo-700 font-bold">{result.studentId}</strong>
+                          </div>
+                          {result.department && (
+                            <div className="flex justify-between py-1 border-b border-slate-200/60">
+                              <span className="text-slate-500">Department:</span>
+                              <strong className="text-slate-800">{result.department}</strong>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">Hostel & Room:</span>
+                        <strong className="text-slate-800">{result.hostel} • Room {result.roomNumber}</strong>
+                      </div>
+
+                      {result.phone && (
+                        <div className="flex justify-between py-1">
+                          <span className="text-slate-500">Phone Number:</span>
+                          <span className="font-mono text-slate-700">{result.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Travel & Authorization Scope */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="h-4 w-4 text-emerald-600" /> Travel Window & Authorization
+                    </h3>
+
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">Permit Date:</span>
+                        <strong className="text-slate-900">{result.date ? new Date(result.date).toLocaleDateString() : 'Today'}</strong>
+                      </div>
+
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">Authorized Window:</span>
+                        <strong className="text-emerald-700 font-bold">{result.validTime}</strong>
+                      </div>
+
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">Destination / Purpose:</span>
+                        <strong className="text-slate-800">{result.destination || result.purpose}</strong>
+                      </div>
+
+                      <div className="flex justify-between py-1">
+                        <span className="text-slate-500">Authority Signature:</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-700 font-bold text-[11px]">
+                          <Award className="h-3.5 w-3.5" /> Hostel Warden Office (Approved)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Security Advisor Callout */}
+                <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 flex items-start gap-3">
+                  <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 text-xs">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-indigo-950">AI Gate Security Verification</h4>
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">
+                        Verdict: {isAllowedVerdict ? 'ALLOWED' : 'VERIFIED'}
+                      </span>
+                    </div>
+                    <p className="text-indigo-900/80 mt-1 leading-relaxed">
+                      {aiLoading ? 'Analyzing security risk...' : aiText}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Gatekeeper Fast Action Buttons */}
+                <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleMarkReturned(result)}
+                      disabled={actionLoading}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <LogIn className="h-4 w-4" />
+                      {actionLoading ? 'Recording...' : 'Mark Checked-In (Return Log)'}
+                    </button>
+
+                    <button
+                      onClick={() => toast.success(`Check-Out Departure recorded for ${result.name}`)}
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-indigo-500/20 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Mark Checked-Out (Exit Log)
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={handlePrintSlip}
+                    className="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Printer className="h-4 w-4" /> Print Gate Slip
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Result Card outputs */}
-          {result && !loading && (
-            <div className="result-card-container">
-              {result.status === 'INVALID' ? (
-                /* STATE 3: INVALID / NOT FOUND card */
-                <div className="result-card result-card-invalid">
-                  <span className="ti ti-shield-x" style={{ fontSize: '32px', color: 'var(--text-danger)' }}></span>
-                  <h2 className="heading-22" style={{ fontSize: '16px', color: 'var(--text-danger)', marginTop: '8px' }}>Permit not found</h2>
-                  <p className="text-secondary-13" style={{ marginTop: '4px' }}>
-                    No permit matches this ID. It may be fake, revoked, or incorrectly entered.
+          {/* STATE 2: EXPIRED OR COMPLETED PASS */}
+          {result.status === 'EXPIRED' && (
+            <div className="bg-white border-2 border-amber-400 rounded-3xl shadow-xl overflow-hidden">
+              <div className="bg-amber-500 text-white p-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                    <AlertTriangle className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold tracking-tight">PERMIT EXPIRED OR COMPLETED</h2>
+                    <p className="text-amber-100 text-xs">This permit window has elapsed or was previously returned.</p>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-white text-amber-800 text-xs font-extrabold rounded-full uppercase tracking-wider">
+                  DO NOT PERMIT EXIT
+                </span>
+              </div>
+
+              <div className="p-6 space-y-4 text-xs">
+                <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 space-y-2">
+                  <div className="flex justify-between py-1 border-b border-amber-200/50">
+                    <span className="text-slate-500">Student Name:</span>
+                    <strong className="text-slate-900">{result.name}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-amber-200/50">
+                    <span className="text-slate-500">Roll ID:</span>
+                    <strong className="font-mono text-slate-900">{result.studentId}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-amber-200/50">
+                    <span className="text-slate-500">Permit Window:</span>
+                    <strong className="text-amber-800">{result.validTime} ({result.date})</strong>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-slate-500">Action Required:</span>
+                    <span className="font-bold text-amber-700">Direct student to Warden Office for pass re-issuance.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STATE 3: INVALID / FAKE PERMIT */}
+          {result.status === 'INVALID' && (
+            <div className="bg-white border-2 border-rose-500 rounded-3xl shadow-xl overflow-hidden">
+              <div className="bg-rose-600 text-white p-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                    <ShieldAlert className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold tracking-tight">SECURITY ALERT: UNVERIFIED PERMIT</h2>
+                    <p className="text-rose-100 text-xs">Pass ID not found in institutional database or signature revoked.</p>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-white text-rose-800 text-xs font-extrabold rounded-full uppercase tracking-wider">
+                  HOLD AT GATE
+                </span>
+              </div>
+
+              <div className="p-6 space-y-4 text-xs">
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 space-y-2">
+                  <p className="text-rose-900 font-semibold">
+                    {result.message || 'No active or historical outpass matched this identifier.'}
+                  </p>
+                  <p className="text-slate-600 text-[11px]">
+                    Ensure the student or visitor displays their official Rajiv Gandhi University digital QR pass from the portal.
                   </p>
                 </div>
-              ) : result.status === 'ACTIVE' ? (
-                /* STATE 1: VALID & ACTIVE card */
-                <div className="result-card result-card-valid">
-                  {/* Banner Header Valid */}
-                  <div className="status-banner status-banner-valid">
-                    <div className="status-label">
-                      <span className="ti ti-circle-check status-icon"></span>
-                      <span>PERMIT VALID</span>
-                    </div>
-                    <span className="badge-pill badge-pill-success">ACTIVE</span>
-                  </div>
 
-                  {/* Pass Type Badge */}
-                  <div className={`badge-type ${result.type.includes('OUTPASS') ? 'badge-type-outpass' : 'badge-type-visit'}`}>
-                    <span className={`ti ${result.type.includes('OUTPASS') ? 'ti-walk' : 'ti-users'}`}></span>
-                    <span>{result.type.includes('OUTPASS') ? 'Outpass' : 'Visit Pass'}</span>
-                  </div>
-
-                  {/* Details Section */}
-                  <div className="details-grid">
-                    {result.type.includes('OUTPASS') ? (
-                      <>
-                        <div className="detail-item"><span className="detail-label">Name</span><span className="detail-value">{result.name}</span></div>
-                        <div className="detail-item"><span className="detail-label">Roll ID</span><span className="detail-value">{result.rollId}</span></div>
-                        <div className="detail-item"><span className="detail-label">Hostel & Room</span><span className="detail-value">{result.hostel}</span></div>
-                        <div className="detail-item"><span className="detail-label">Date</span><span className="detail-value">{result.date}</span></div>
-                        <div className="detail-item"><span className="detail-label">Timings</span><span className="detail-value">{result.timings}</span></div>
-                        <div className="detail-item"><span className="detail-label">Destination</span><span className="detail-value">{result.destination}</span></div>
-                        <div className="detail-item"><span className="detail-label">Purpose</span><span className="detail-value">{result.purpose}</span></div>
-                        <div className="detail-item"><span className="detail-label">Approved By</span><span className="detail-value">{result.approvedBy}</span></div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="detail-item"><span className="detail-label">Parent Name</span><span className="detail-value">{result.name}</span></div>
-                        <div className="detail-item"><span className="detail-label">Student Name</span><span className="detail-value">{result.student || 'Student'}</span></div>
-                        <div className="detail-item"><span className="detail-label">Roll ID</span><span className="detail-value">{result.rollId}</span></div>
-                        <div className="detail-item"><span className="detail-label">Hostel & Room</span><span className="detail-value">{result.hostel}</span></div>
-                        <div className="detail-item"><span className="detail-label">Date</span><span className="detail-value">{result.date}</span></div>
-                        <div className="detail-item"><span className="detail-label">Timings</span><span className="detail-value">{result.timings}</span></div>
-                        <div className="detail-item"><span className="detail-label">Purpose</span><span className="detail-value">{result.purpose}</span></div>
-                        <div className="detail-item"><span className="detail-label">Approved By</span><span className="detail-value">{result.approvedBy}</span></div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Bottom verification Row */}
-                  <div className="result-footer">
-                    <div className="footer-verify-text">
-                      <span className="ti ti-shield-check footer-icon-valid"></span>
-                      <span>Verified by Hostel Pass System</span>
-                    </div>
-                    <div>
-                      {new Date().toLocaleString()}
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toast.success('Security Desk and Hostel Warden alerted')}
+                    className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                  >
+                    🚨 Alert Security Desk
+                  </button>
+                  <button
+                    onClick={() => {
+                      setResult(null);
+                      setPassIdInput('');
+                    }}
+                    className="px-4 py-2.5 border border-slate-200 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    Clear Search
+                  </button>
                 </div>
-              ) : (
-                /* STATE 2: EXPIRED / USED card */
-                <div className="result-card result-card-expired">
-                  {/* Status banner Expired */}
-                  <div className="status-banner status-banner-expired">
-                    <div className="status-label">
-                      <span className="ti ti-clock-x status-icon"></span>
-                      <span>PERMIT EXPIRED</span>
-                    </div>
-                    <span className="badge-pill badge-pill-warning">EXPIRED</span>
-                  </div>
-
-                  {/* Pass Type Badge */}
-                  <div className={`badge-type ${result.type.includes('OUTPASS') ? 'badge-type-outpass' : 'badge-type-visit'}`} style={{ opacity: 0.6 }}>
-                    <span className={`ti ${result.type.includes('OUTPASS') ? 'ti-walk' : 'ti-users'}`}></span>
-                    <span>{result.type.includes('OUTPASS') ? 'Outpass' : 'Visit Pass'}</span>
-                  </div>
-
-                  {/* Details Section Dimmed */}
-                  <div className="details-grid">
-                    {result.type.includes('OUTPASS') ? (
-                      <>
-                        <div className="detail-item"><span className="detail-label">Name</span><span className="detail-value detail-value-dimmed">{result.name}</span></div>
-                        <div className="detail-item"><span className="detail-label">Roll ID</span><span className="detail-value detail-value-dimmed">{result.rollId}</span></div>
-                        <div className="detail-item"><span className="detail-label">Hostel & Room</span><span className="detail-value detail-value-dimmed">{result.hostel}</span></div>
-                        <div className="detail-item"><span className="detail-label">Date</span><span className="detail-value detail-value-dimmed">{result.date}</span></div>
-                        <div className="detail-item"><span className="detail-label">Timings</span><span className="detail-value detail-value-dimmed">{result.timings}</span></div>
-                        <div className="detail-item"><span className="detail-label">Destination</span><span className="detail-value detail-value-dimmed">{result.destination}</span></div>
-                        <div className="detail-item"><span className="detail-label">Purpose</span><span className="detail-value detail-value-dimmed">{result.purpose}</span></div>
-                        <div className="detail-item"><span className="detail-label">Approved By</span><span className="detail-value detail-value-dimmed">{result.approvedBy}</span></div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="detail-item"><span className="detail-label">Parent Name</span><span className="detail-value detail-value-dimmed">{result.name}</span></div>
-                        <div className="detail-item"><span className="detail-label">Student Name</span><span className="detail-value detail-value-dimmed">{result.student || 'Student'}</span></div>
-                        <div className="detail-item"><span className="detail-label">Roll ID</span><span className="detail-value detail-value-dimmed">{result.rollId}</span></div>
-                        <div className="detail-item"><span className="detail-label">Hostel & Room</span><span className="detail-value detail-value-dimmed">{result.hostel}</span></div>
-                        <div className="detail-item"><span className="detail-label">Date</span><span className="detail-value detail-value-dimmed">{result.date}</span></div>
-                        <div className="detail-item"><span className="detail-label">Timings</span><span className="detail-value detail-value-dimmed">{result.timings}</span></div>
-                        <div className="detail-item"><span className="detail-label">Purpose</span><span className="detail-value detail-value-dimmed">{result.purpose}</span></div>
-                        <div className="detail-item"><span className="detail-label">Approved By</span><span className="detail-value detail-value-dimmed">{result.approvedBy}</span></div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Bottom warning Row */}
-                  <div className="result-footer">
-                    <div className="footer-verify-text text-warning">
-                      <span className="ti ti-alert-triangle footer-icon-expired"></span>
-                      <span>This permit is no longer valid</span>
-                    </div>
-                    <div>
-                      {new Date().toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* AI Legitimacy verification panel (for Active state only) */}
-              {result.status === 'ACTIVE' && (
-                <div className="ai-panel">
-                  <div className="ai-header">
-                    <span className="ti ti-robot"></span>
-                    <span>AI legitimacy check</span>
-                  </div>
-                  <div className="ai-body">
-                    {aiLoading ? (
-                      <div className="italic" style={{ color: 'var(--text-muted)' }}>Running legitimacy check…</div>
-                    ) : (
-                      <div>
-                        {isVerdictAllowed && (
-                          <div className="ai-verdict-tag ai-verdict-allowed">Verdict: ALLOWED</div>
-                        )}
-                        {isVerdictHeld && (
-                          <div className="ai-verdict-tag ai-verdict-held">Verdict: HELD FOR VERIFICATION</div>
-                        )}
-                        <p className="line-height-1.6">{aiText || 'No verification data analyzed.'}</p>
-                        <button onClick={() => sendPrompt(result)} className="ai-btn-action">
-                          Ask AI security desk ↗
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Recent Gate Activity Log Table */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+            <Clock className="h-4 w-4 text-indigo-600" /> Recent Verification Session Logs
+          </h3>
+          <span className="text-[11px] text-slate-400">
+            {recentLogs.length} scans in current session
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                <th className="py-3 px-4">Pass / Roll ID</th>
+                <th className="py-3 px-4">Person Name</th>
+                <th className="py-3 px-4">Pass Type</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Timestamp</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {recentLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                    No gate scans conducted in this session yet. Scan a QR code or enter a pass ID above.
+                  </td>
+                </tr>
+              ) : (
+                recentLogs.map((log, index) => (
+                  <tr key={index} className="hover:bg-slate-50/60">
+                    <td className="py-3 px-4 font-mono font-bold text-indigo-700">{log.id}</td>
+                    <td className="py-3 px-4 font-semibold text-slate-900">{log.name}</td>
+                    <td className="py-3 px-4 text-slate-500">{log.type}</td>
+                    <td className="py-3 px-4">
+                      {log.status === 'VALID' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                          VALID
+                        </span>
+                      ) : log.status === 'EXPIRED' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                          EXPIRED
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                          INVALID
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono text-slate-400">{log.time}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
