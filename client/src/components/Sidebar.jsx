@@ -35,45 +35,17 @@ const Sidebar = () => {
           </NavLink>
 
           <NavLink
-            to="/admin/outpasses"
+            to="/admin/passes"
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-                isActive
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15'
-                  : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
-              }`
-            }
-          >
-            <FileText className="h-4 w-4" />
-            <span>Outpass Requests</span>
-          </NavLink>
-
-          <NavLink
-            to="/admin/visit-passes"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-                isActive
+                isActive || location.pathname.startsWith('/admin/passes') || location.pathname.startsWith('/admin/outpasses') || location.pathname.startsWith('/admin/visit-passes') || location.pathname.startsWith('/admin/active-passes')
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15'
                   : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
               }`
             }
           >
             <ClipboardList className="h-4 w-4" />
-            <span>Visit Pass Requests</span>
-          </NavLink>
-
-          <NavLink
-            to="/admin/active-passes"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-                isActive
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/15'
-                  : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
-              }`
-            }
-          >
-            <Shield className="h-4 w-4" />
-            <span>Active Passes</span>
+            <span>Pass Management</span>
           </NavLink>
 
           <NavLink

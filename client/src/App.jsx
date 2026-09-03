@@ -34,6 +34,7 @@ import VerifyPass from './pages/admin/VerifyPass';
 import ActivePasses from './pages/admin/ActivePasses';
 import HostelBlocks from './pages/admin/HostelBlocks';
 import UsersAndRoles from './pages/admin/UsersAndRoles';
+import PassManagement from './pages/admin/PassManagement';
 
 const DashboardLayout = ({ children }) => {
   return (
@@ -181,11 +182,21 @@ function App() {
               }
             />
             <Route
+              path="/admin/passes"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'warden', 'security']}>
+                  <DashboardLayout>
+                    <PassManagement />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/outpasses"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'warden']}>
                   <DashboardLayout>
-                    <ManageOutpasses />
+                    <PassManagement />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
@@ -193,9 +204,9 @@ function App() {
             <Route
               path="/admin/visit-passes"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'warden']}>
                   <DashboardLayout>
-                    <ManageVisitPasses />
+                    <PassManagement />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
@@ -203,9 +214,9 @@ function App() {
             <Route
               path="/admin/active-passes"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'warden', 'security']}>
                   <DashboardLayout>
-                    <ActivePasses />
+                    <PassManagement />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
