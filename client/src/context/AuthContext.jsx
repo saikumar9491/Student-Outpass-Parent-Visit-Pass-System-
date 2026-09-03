@@ -65,9 +65,13 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       console.error('Login action failed:', error);
+      const message = error.response?.data?.message 
+        || (error.message === 'Network Error' 
+            ? 'Unable to connect to server API. Please verify backend service is running or check VITE_API_URL.' 
+            : error.message || 'Login failed. Please check credentials.');
       return {
         success: false,
-        message: error.response?.data?.message || 'Login failed. Please check credentials.'
+        message
       };
     }
   };
