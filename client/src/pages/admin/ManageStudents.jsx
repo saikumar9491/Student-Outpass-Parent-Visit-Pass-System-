@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import API from '../../services/api';
 import { toast } from 'react-hot-toast';
-import { Search, Calendar, BookOpen, Home, Phone, Mail, UserPlus, Trash2, X, Edit } from 'lucide-react';
+import { 
+  Search, Calendar, BookOpen, Home, Phone, Mail, UserPlus, 
+  Trash2, X, Edit, Users, Building, GraduationCap, Filter, Download
+} from 'lucide-react';
 import Loading from '../../components/Loading';
 
 const ManageStudents = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedDept, setSelectedDept] = useState('ALL');
+  const [selectedYear, setSelectedYear] = useState('ALL');
+  const [selectedHostel, setSelectedHostel] = useState('ALL');
 
   // Add Student Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -203,138 +209,299 @@ const ManageStudents = () => {
     }
   };
 
-  const filteredStudents = students.filter(student => 
-    student.name.toLowerCase().includes(search.toLowerCase()) ||
-    student.studentId.toLowerCase().includes(search.toLowerCase()) ||
-    student.hostel.toLowerCase().includes(search.toLowerCase()) ||
-    student.department.toLowerCase().includes(search.toLowerCase())
-  );
+  // Distinct departments and hostels for filters
+  const departments = Array.from(new Set(students.map(s => s.department).filter(Boolean)));
+  const hostels = Array.from(new Set(students.map(s => s.hostel).filter(Boolean)));
+
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = 
+      student.name?.toLowerCase().includes(search.toLowerCase()) ||
+      student.studentId?.toLowerCase().includes(search.toLowerCase()) ||
+      student.hostel?.toLowerCase().includes(search.toLowerCase()) ||
+      student.department?.toLowerCase().includes(search.toLowerCase()) ||
+      student.email?.toLowerCase().includes(search.toLowerCase()) ||
+      student.phone?.toLowerCase().includes(search.toLowerCase());
+
+    const matchesDept = selectedDept === 'ALL' || student.department === selectedDept;
+    const matchesYear = selectedYear === 'ALL' || student.year === selectedYear;
+    const matchesHostel = selectedHostel === 'ALL' || student.hostel === selectedHostel;
+
+    return matchesSearch && matchesDept && matchesYear && matchesHostel;
+  });
 
   if (loading) return <Loading size="lg" />;
 
   return (
     <div className="space-y-6 text-left">
-      {/* Header */}
+      {/* Header & Metrics */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 mb-1 font-display">Manage Students</h1>
-          <p className="text-slate-600 text-xs font-sans">View, register, or delete hostel student records and linked associations.</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold text-slate-900 font-display">Students Directory</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              {students.length} Total Registered
+            </span>
+          </div>
+          <p className="text-slate-500 text-xs font-sans mt-0.5">
+            Manage student records, departmental allocations, hostel rooms, and linked parent profiles.
+          </p>
         </div>
         <button
           onClick={openAddModal}
-          className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#3b82f6] hover:bg-[#1d4ed8] text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
         >
-          <UserPlus className="h-4 w-4" /> Register Student
+          <UserPlus className="h-4 w-4" /> Register New Student
         </button>
       </div>
 
-      {/* Search Filter */}
-      <div className="relative w-full md:w-72">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by student name, roll, hostel..."
-          className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-850 placeholder-slate-450 focus:outline-none transition-colors"
-        />
-      </div>
-
-      {/* Students Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredStudents.length === 0 ? (
-          <div className="col-span-full py-16 text-center text-xs text-slate-500 bg-white border border-slate-200 rounded-2xl">
-            No student accounts found.
+      {/* Filter and Search Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by student name, roll ID, email, phone, room..."
+              className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl py-2 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all"
+            />
+            {search && (
+              <button 
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+              >
+                Clear
+              </button>
+            )}
           </div>
-        ) : (
-          filteredStudents.map(student => (
-            <div key={student._id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-700 transition-colors shadow-lg space-y-4 relative">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3 text-left">
-                  {student.image ? (
-                    <img src={student.image} alt={student.name} className="h-10 w-10 object-cover rounded-full border border-slate-200" />
-                  ) : (
-                    <div className="h-10 w-10 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 text-slate-400 font-bold text-sm">
-                      {student.name ? student.name.charAt(0) : 'S'}
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="font-bold text-slate-750 text-sm font-display">{student.name}</h3>
-                    <span className="text-[10px] text-blue-400 font-mono font-bold uppercase block mt-0.5">{student.studentId}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] bg-blue-950/40 border border-blue-900/50 text-blue-400 px-2 py-0.5 rounded font-semibold">
-                    {student.year}
-                  </span>
-                  <button
-                    onClick={() => handleEditClick(student)}
-                    className="p-1 text-slate-500 hover:text-blue-500 hover:bg-slate-50 rounded transition-colors cursor-pointer"
-                    title="Edit Student"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  {student.userId?._id && (
-                    <button
-                      onClick={() => handleDelete(student.userId._id, student.name)}
-                      className="p-1 text-slate-500 hover:text-red-500 hover:bg-slate-50 rounded transition-colors cursor-pointer"
-                      title="Delete Student"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-600 border-t border-slate-200 pt-3">
-                <div className="flex items-center gap-1.5">
-                  <BookOpen className="h-3.5 w-3.5 text-blue-400/80" />
-                  <span className="truncate">{student.department}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Home className="h-3.5 w-3.5 text-blue-400/80" />
-                  <span className="truncate">{student.hostel} &bull; Room {student.roomNumber}</span>
-                </div>
-                <div className="flex items-center gap-1.5 sm:col-span-2">
-                  <Mail className="h-3.5 w-3.5 text-slate-500" />
-                  <span className="truncate">{student.email}</span>
-                </div>
-                <div className="flex items-center gap-1.5 sm:col-span-2">
-                  <Phone className="h-3.5 w-3.5 text-slate-500" />
-                  <span>{student.phone}</span>
-                </div>
-              </div>
+          {/* Department Filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 font-medium cursor-pointer"
+            >
+              <option value="ALL">All Departments</option>
+              {departments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
 
-              <div className="text-[9px] text-slate-500 flex justify-between items-center border-t border-slate-200 pt-2.5">
-                <span>Parents Linked: {student.parentIds?.length || 0}</span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Joined: {student.userId?.createdAt ? new Date(student.userId.createdAt).toLocaleDateString() : 'N/A'}
-                </span>
-              </div>
-            </div>
-          ))
-        )}
+            {/* Year Filter */}
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 font-medium cursor-pointer"
+            >
+              <option value="ALL">All Years</option>
+              <option value="1st Year">1st Year</option>
+              <option value="2nd Year">2nd Year</option>
+              <option value="3rd Year">3rd Year</option>
+              <option value="4th Year">4th Year</option>
+            </select>
+
+            {/* Hostel Filter */}
+            <select
+              value={selectedHostel}
+              onChange={(e) => setSelectedHostel(e.target.value)}
+              className="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 font-medium cursor-pointer"
+            >
+              <option value="ALL">All Hostels</option>
+              {hostels.map(h => (
+                <option key={h} value={h}>{h}</option>
+              ))}
+            </select>
+
+            {(selectedDept !== 'ALL' || selectedYear !== 'ALL' || selectedHostel !== 'ALL' || search) && (
+              <button
+                onClick={() => {
+                  setSelectedDept('ALL');
+                  setSelectedYear('ALL');
+                  setSelectedHostel('ALL');
+                  setSearch('');
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-2 py-1"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Add Student Modal */}
+      {/* Students Data Table (Rows & Columns) */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="py-3.5 px-4">#</th>
+                <th className="py-3.5 px-4">Student</th>
+                <th className="py-3.5 px-4">Roll ID</th>
+                <th className="py-3.5 px-4">Department & Year</th>
+                <th className="py-3.5 px-4">Hostel & Room</th>
+                <th className="py-3.5 px-4">Contact Info</th>
+                <th className="py-3.5 px-4">Linked Parent</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center text-slate-400">
+                    <Users className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                    <p className="font-semibold">No student records found</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Try adjusting your search criteria or register a new student.</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((student, index) => (
+                  <tr key={student._id} className="hover:bg-slate-50/70 transition-colors">
+                    {/* Index */}
+                    <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
+                      {index + 1}
+                    </td>
+
+                    {/* Student Info */}
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        {student.image ? (
+                          <img 
+                            src={student.image} 
+                            alt={student.name} 
+                            className="h-9 w-9 rounded-full object-cover border border-slate-200 shrink-0" 
+                          />
+                        ) : (
+                          <div className="h-9 w-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-200">
+                            {student.name ? student.name.charAt(0).toUpperCase() : 'S'}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-bold text-slate-900 text-xs">{student.name}</p>
+                          <p className="text-[10px] text-slate-400">
+                            Joined: {student.userId?.createdAt ? new Date(student.userId.createdAt).toLocaleDateString() : 'Active'}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Roll ID */}
+                    <td className="py-3.5 px-4 font-mono font-bold text-blue-600 text-[11px]">
+                      {student.studentId}
+                    </td>
+
+                    {/* Department & Year */}
+                    <td className="py-3.5 px-4">
+                      <p className="font-medium text-slate-800 text-xs">{student.department || 'General'}</p>
+                      <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {student.year || '1st Year'}
+                      </span>
+                    </td>
+
+                    {/* Hostel & Room */}
+                    <td className="py-3.5 px-4">
+                      <p className="font-medium text-slate-800 text-xs flex items-center gap-1.5">
+                        <Home className="h-3.5 w-3.5 text-slate-400" />
+                        {student.hostel || 'Main Block'}
+                      </p>
+                      <span className="inline-block mt-1 text-[11px] font-mono text-slate-500">
+                        Room <strong className="text-slate-800 font-semibold">{student.roomNumber || 'N/A'}</strong>
+                      </span>
+                    </td>
+
+                    {/* Contact Info */}
+                    <td className="py-3.5 px-4">
+                      <div className="space-y-1">
+                        <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                          <Mail className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[160px]">{student.email}</span>
+                        </p>
+                        <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                          <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span>{student.phone}</span>
+                        </p>
+                      </div>
+                    </td>
+
+                    {/* Linked Parent */}
+                    <td className="py-3.5 px-4">
+                      {student.parentIds && student.parentIds.length > 0 ? (
+                        <div className="space-y-0.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {student.parentIds[0]?.relationship || 'Parent'}: {student.parentIds[0]?.name || 'Linked'}
+                          </span>
+                          {student.parentIds[0]?.phone && (
+                            <p className="text-[10px] text-slate-400 pl-1">{student.parentIds[0].phone}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 italic">None linked</span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleEditClick(student)}
+                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Student"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        {student.userId?._id && (
+                          <button
+                            onClick={() => handleDelete(student.userId._id, student.name)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Student"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Table Footer */}
+        <div className="p-4 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+          <span>
+            Showing <strong className="text-slate-800 font-semibold">{filteredStudents.length}</strong> of{' '}
+            <strong className="text-slate-800 font-semibold">{students.length}</strong> students
+          </span>
+          <span className="text-[11px] text-slate-400">
+            Click edit ✏️ to update student department, room, or picture.
+          </span>
+        </div>
+      </div>
+
+      {/* Add / Edit Student Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6 overflow-y-auto">
           <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl space-y-4 my-8">
             <div className="flex justify-between items-center border-b border-slate-200 pb-3">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <UserPlus className="h-5 w-5 text-blue-400" /> {isEditMode ? 'Edit Student Details' : 'Register Student & Parent Account'}
+                <UserPlus className="h-5 w-5 text-blue-600" /> {isEditMode ? 'Edit Student Details' : 'Register Student & Parent Account'}
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-600 hover:text-white cursor-pointer"><X className="h-5 w-5" /></button>
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
             <form onSubmit={handleAddSubmit} className="space-y-4 text-xs font-semibold text-slate-600">
               {/* SECTION 1: Student Details */}
               <div className="border-b border-slate-200 pb-2">
-                <span className="text-[10px] text-blue-405 uppercase tracking-wider block mb-2">Student Information</span>
+                <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider block mb-2">Student Information</span>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Full Name</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Full Name</label>
                     <input
                       type="text"
                       name="name"
@@ -342,12 +509,12 @@ const ManageStudents = () => {
                       value={formData.name}
                       onChange={handleChange}
                       placeholder="Robert Doe"
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Email Address</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Email Address</label>
                     <input
                       type="email"
                       name="email"
@@ -355,7 +522,7 @@ const ManageStudents = () => {
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="robert.doe@hostel.edu"
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
@@ -363,7 +530,7 @@ const ManageStudents = () => {
                 <div className="grid grid-cols-2 gap-4 mt-3">
                   {!isEditMode ? (
                     <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Student Password</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Student Password</label>
                       <input
                         type="text"
                         name="password"
@@ -371,7 +538,7 @@ const ManageStudents = () => {
                         value={formData.password}
                         onChange={handleChange}
                         placeholder="Min 6 characters"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                       />
                       <span className="text-[8px] text-slate-400 block mt-1 font-normal leading-normal">
                         Student can change this password after logging in.
@@ -379,21 +546,21 @@ const ManageStudents = () => {
                     </div>
                   ) : (
                     <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Student Password</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Student Password</label>
                       <input
                         type="text"
                         disabled
                         value="••••••••"
                         className="w-full bg-slate-100 border border-slate-200 rounded-xl py-2 px-3 text-slate-400 focus:outline-none cursor-not-allowed"
                       />
-                      <span className="text-[8px] text-slate-400 block mt-1 font-normal leading-normal font-normal">
+                      <span className="text-[8px] text-slate-400 block mt-1 font-normal leading-normal">
                         Password can be updated by the student in their settings.
                       </span>
                     </div>
                   )}
 
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Phone Number</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Phone Number</label>
                     <input
                       type="text"
                       name="phone"
@@ -401,14 +568,14 @@ const ManageStudents = () => {
                       value={formData.phone}
                       onChange={handleChange}
                       placeholder="9876543210"
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-3">
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Student Profile Picture</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Student Profile Picture</label>
                     <input
                       type="file"
                       accept="image/*"
@@ -427,30 +594,30 @@ const ManageStudents = () => {
 
                 <div className="grid grid-cols-3 gap-4 mt-3">
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Admission Year</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Admission Year</label>
                     <input
                       type="number"
                       value={admissionYear}
                       onChange={handleAdmissionYearChange}
                       min="2020"
                       max="2035"
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Generated Roll ID</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Generated Roll ID</label>
                     <input
                       type="text"
                       name="studentId"
                       readOnly
                       value={formData.studentId}
-                      className="w-full bg-slate-100 border border-slate-200 text-blue-400 font-mono focus:outline-none rounded-xl py-2 px-3 cursor-not-allowed"
+                      className="w-full bg-slate-100 border border-slate-200 text-blue-600 font-mono font-bold focus:outline-none rounded-xl py-2 px-3 cursor-not-allowed"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Department</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Department</label>
                     <input
                       type="text"
                       name="department"
@@ -458,19 +625,19 @@ const ManageStudents = () => {
                       value={formData.department}
                       onChange={handleChange}
                       placeholder="e.g. Computer Science"
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4 mt-3 mb-2">
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Year of Study</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Year of Study</label>
                     <select
                       name="year"
                       value={formData.year}
                       onChange={handleChange}
-                      className="w-full bg-slate-100 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors appearance-none cursor-pointer"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors cursor-pointer"
                     >
                       <option value="1st Year">1st Year</option>
                       <option value="2nd Year">2nd Year</option>
@@ -480,7 +647,7 @@ const ManageStudents = () => {
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Hostel Block</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Hostel Block</label>
                     <input
                       type="text"
                       name="hostel"
@@ -488,12 +655,12 @@ const ManageStudents = () => {
                       value={formData.hostel}
                       onChange={handleChange}
                       placeholder="e.g. Kaveri Boys"
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Room Number</label>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Room Number</label>
                     <input
                       type="text"
                       name="roomNumber"
@@ -501,7 +668,7 @@ const ManageStudents = () => {
                       value={formData.roomNumber}
                       onChange={handleChange}
                       placeholder="101"
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
@@ -510,10 +677,10 @@ const ManageStudents = () => {
               {/* SECTION 2: Parent Details */}
               {!isEditMode && (
                 <div>
-                  <span className="text-[10px] text-indigo-400 uppercase tracking-wider block mb-2">Parent / Guardian Information (Login Setup)</span>
+                  <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block mb-2">Parent / Guardian Information (Login Setup)</span>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Parent Name</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Name</label>
                       <input
                         type="text"
                         name="parentName"
@@ -521,12 +688,12 @@ const ManageStudents = () => {
                         value={formData.parentName}
                         onChange={handleChange}
                         placeholder="Jane Doe"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                       />
                     </div>
 
                     <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Parent Email</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Email</label>
                       <input
                         type="email"
                         name="parentEmail"
@@ -534,14 +701,14 @@ const ManageStudents = () => {
                         value={formData.parentEmail}
                         onChange={handleChange}
                         placeholder="jane.doe@email.com"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 mt-3">
                     <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Parent Phone</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Phone</label>
                       <input
                         type="text"
                         name="parentPhone"
@@ -549,17 +716,17 @@ const ManageStudents = () => {
                         value={formData.parentPhone}
                         onChange={handleChange}
                         placeholder="9876543211"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                       />
                     </div>
 
                     <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Relationship</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Relationship</label>
                       <select
                         name="parentRelationship"
                         value={formData.parentRelationship}
                         onChange={handleChange}
-                        className="w-full bg-slate-100 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors appearance-none cursor-pointer"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors cursor-pointer"
                       >
                         <option value="Mother">Mother</option>
                         <option value="Father">Father</option>
@@ -568,7 +735,7 @@ const ManageStudents = () => {
                     </div>
 
                     <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Parent Password</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Password</label>
                       <input
                         type="text"
                         name="parentPassword"
@@ -576,7 +743,7 @@ const ManageStudents = () => {
                         value={formData.parentPassword}
                         onChange={handleChange}
                         placeholder="e.g. 123456"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-850 focus:outline-none transition-colors"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl py-2 px-3 text-slate-800 focus:outline-none transition-colors"
                       />
                       <span className="text-[8px] text-slate-400 block mt-1 font-normal leading-normal">
                         Parent can change this password after logging in.
@@ -586,7 +753,7 @@ const ManageStudents = () => {
 
                   <div className="grid grid-cols-2 gap-4 mt-3">
                     <div>
-                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold">Parent Profile Picture</label>
+                      <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent Profile Picture</label>
                       <input
                         type="file"
                         accept="image/*"
@@ -609,14 +776,14 @@ const ManageStudents = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-800 text-slate-450 cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 bg-[#3b82f6] hover:bg-[#1d4ed8] text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer font-medium disabled:opacity-50"
                 >
                   {isSubmitting ? (isEditMode ? 'Saving...' : 'Registering...') : (isEditMode ? 'Save Changes' : 'Register Student & Parent')}
                 </button>
