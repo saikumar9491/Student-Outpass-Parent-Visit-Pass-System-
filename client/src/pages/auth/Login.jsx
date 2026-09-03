@@ -63,17 +63,17 @@ const Login = () => {
 
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-xl space-y-6">
         {/* University Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-1">
           <img 
             src="https://www.rgukt.in/assets/media/logos/rgukt.png" 
             alt="RGUT Logo" 
             className="h-14 w-14 object-contain mx-auto mb-3" 
           />
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 font-display">
-            Sign In to Hostel Portal
+            Sign In
           </h2>
-          <p className="text-slate-500 text-xs">
-            Enter your assigned Student Roll ID, Parent ID, or Administrator credentials.
+          <p className="text-slate-500 text-xs font-medium">
+            rajiv-gandhi-university
           </p>
         </div>
 
@@ -81,7 +81,7 @@ const Login = () => {
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
           <div>
             <label className="text-xs font-bold text-slate-700 block mb-1.5 uppercase tracking-wider text-[10px]">
-              User ID / Roll No / Email
+              User ID
             </label>
             <div className="relative">
               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
@@ -90,7 +90,7 @@ const Login = () => {
                 required
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
-                placeholder="e.g. 12612345, PAR-123456, or Email"
+                placeholder="Enter your User ID"
                 className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl py-2.5 pl-11 pr-4 text-sm text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-mono"
               />
             </div>
@@ -118,7 +118,7 @@ const Login = () => {
             disabled={isSubmitting}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl py-3 flex items-center justify-center gap-2 transition-all duration-200 shadow-md shadow-blue-500/20 active:scale-98 disabled:opacity-50 cursor-pointer mt-2"
           >
-            <LogIn className="h-4.5 w-4.5" /> {isSubmitting ? 'Signing In...' : 'Sign In to Portal'}
+            <LogIn className="h-4.5 w-4.5" /> {isSubmitting ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
 
