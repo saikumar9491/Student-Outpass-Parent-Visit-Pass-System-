@@ -2,7 +2,12 @@
   "name": "student-outpass-parent-visit-pass-system",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
-    "build": "cd client && npm install && npm run build"
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix client preview"
   }
 }
