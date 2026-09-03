@@ -6,7 +6,7 @@ import {
   ShieldCheck, ShieldAlert, AlertTriangle, Search, QrCode, 
   CheckCircle2, XCircle, Clock, User, Building, MapPin, 
   Calendar, Phone, ArrowRight, Check, Printer, RefreshCw, 
-  Sparkles, Camera, LogOut, LogIn, Award
+  Sparkles, Camera, LogOut, LogIn, Award, Scan
 } from 'lucide-react';
 
 const VerifyPass = () => {
@@ -108,14 +108,14 @@ const VerifyPass = () => {
       setResult({
         status: 'INVALID',
         passId: searchId,
-        message: error.response?.data?.message || `Pass ID "${searchId}" is not found or fake.`
+        message: error.response?.data?.message || `Pass ID "${searchId}" is not found in the database.`
       });
 
       setRecentLogs(prev => [
         {
           id: searchId,
-          name: 'Unknown / Fake',
-          type: 'Unverified',
+          name: 'Unknown / Unverified',
+          type: 'Unregistered',
           status: 'INVALID',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         },
@@ -134,7 +134,7 @@ const VerifyPass = () => {
 
     setActionLoading(true);
     try {
-      const endpoint = pass.passType.includes('Outpass') 
+      const endpoint = pass.passType?.includes('Outpass') 
         ? `/admin/outpasses/${pass._id}/return`
         : `/admin/visit-passes/${pass._id}/return`;
       await API.put(endpoint);
@@ -152,7 +152,7 @@ const VerifyPass = () => {
     window.print();
   };
 
-  // Preset demo test IDs
+  // Demo test presets
   const loadDemoPass = (type) => {
     if (type === 'OUTPASS') {
       setPassIdInput('OUT-2026-DEMO');
@@ -217,7 +217,7 @@ const VerifyPass = () => {
       setResult({
         status: 'INVALID',
         passId: 'FAKE-999-XYZ',
-        message: 'Security Alert: QR Signature signature mismatch or unissued Pass ID.'
+        message: 'Security Alert: QR Signature mismatch or unissued Pass ID.'
       });
     }
   };
@@ -225,82 +225,77 @@ const VerifyPass = () => {
   const isAllowedVerdict = aiText.toUpperCase().includes('ALLOWED') || aiText.toUpperCase().includes('VALID');
 
   return (
-    <div className="space-y-6 text-left font-sans">
-      {/* Top Gate Checkpoint Header Bar */}
-      <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 text-indigo-400 flex items-center justify-center">
-            <QrCode className="h-6 w-6" />
+    <div className="max-w-5xl mx-auto space-y-6 text-left font-sans">
+      {/* Top Header Card */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold text-slate-900 font-display">Pass Verification</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Gate Terminal Online
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white font-display">Pass Verification Terminal</h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> GATE 1 ACTIVE
-              </span>
-            </div>
-            <p className="text-slate-400 text-xs mt-0.5">
-              Live QR code barcode validation, student identity verification, and gate log tracking.
-            </p>
-          </div>
+          <p className="text-slate-500 text-xs mt-0.5">
+            Verify digital QR codes, check student outpasses, and log gate entries & exits.
+          </p>
         </div>
 
-        {/* Digital Clock & Station ID */}
-        <div className="flex items-center gap-4 bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700/60">
-          <div className="text-right">
-            <div className="text-xs font-mono font-bold text-emerald-400">
+        {/* Live Clock & Camera Toggle */}
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:block text-right bg-white px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+            <div className="text-xs font-mono font-bold text-slate-800">
               {currentTime.toLocaleTimeString()}
             </div>
-            <div className="text-[10px] text-slate-400">
-              {currentTime.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+            <div className="text-[10px] text-slate-400 font-medium">
+              {currentTime.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
             </div>
           </div>
-          <div className="h-6 w-[1px] bg-slate-700"></div>
+
           <button
             onClick={() => setIsScanningMode(!isScanningMode)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-sm ${
               isScanningMode
                 ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20'
             }`}
           >
-            <Camera className="h-3.5 w-3.5" />
-            {isScanningMode ? 'Close Camera' : 'Camera Scan'}
+            <Camera className="h-4 w-4" />
+            {isScanningMode ? 'Close Camera' : 'Camera Scanner'}
           </button>
         </div>
       </div>
 
       {/* Camera Simulator Overlay */}
       {isScanningMode && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-white relative overflow-hidden shadow-2xl">
-          <div className="max-w-xs mx-auto border-2 border-dashed border-indigo-500 rounded-2xl p-8 relative">
-            <div className="h-40 flex flex-col items-center justify-center space-y-2">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center text-white relative overflow-hidden shadow-xl">
+          <div className="max-w-xs mx-auto border-2 border-dashed border-indigo-500 rounded-2xl p-6 relative">
+            <div className="h-36 flex flex-col items-center justify-center space-y-2">
               <div className="relative">
-                <QrCode className="h-16 w-16 text-indigo-400 opacity-60 animate-pulse" />
+                <QrCode className="h-14 w-14 text-indigo-400 opacity-70 animate-pulse" />
                 <div className="absolute inset-x-0 h-0.5 bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-bounce"></div>
               </div>
-              <p className="text-xs text-slate-300 font-medium">Align Digital Pass QR Code in Box</p>
-              <p className="text-[10px] text-slate-500">Auto-detects Outpass & Parent Passes</p>
+              <p className="text-xs text-slate-300 font-medium">Point Camera at Student's Digital QR Pass</p>
             </div>
           </div>
           <div className="mt-4 flex justify-center gap-2">
             <button
               onClick={() => loadDemoPass('OUTPASS')}
-              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
             >
-              Simulate QR Scan (Outpass)
+              Simulate Scan: Outpass
             </button>
             <button
               onClick={() => loadDemoPass('VISIT')}
-              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
             >
-              Simulate QR Scan (Parent Pass)
+              Simulate Scan: Parent Pass
             </button>
           </div>
         </div>
       )}
 
-      {/* Main Search Bar Card */}
+      {/* Main Search / Scanner Card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
         <form 
           onSubmit={(e) => {
@@ -310,7 +305,7 @@ const VerifyPass = () => {
           className="flex flex-col sm:flex-row items-stretch gap-3"
         >
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <Scan className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-500" />
             <input
               type="text"
               value={passIdInput}
@@ -318,8 +313,8 @@ const VerifyPass = () => {
                 setPassIdInput(e.target.value);
                 if (errorMsg) setErrorMsg('');
               }}
-              placeholder="SCAN BARCODE / ENTER PASS ID (e.g. OUT-123456) OR STUDENT ROLL NO (e.g. 12612345)"
-              className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl py-3 pl-12 pr-4 text-sm font-mono text-slate-900 placeholder-slate-400 focus:outline-none transition-all uppercase tracking-wider"
+              placeholder="SCAN QR CODE / ENTER PASS ID (e.g. OUT-123456) OR ROLL NO"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-xl py-3 pl-12 pr-4 text-xs font-mono font-bold text-slate-900 placeholder-slate-400 focus:outline-none transition-all uppercase tracking-wider"
             />
           </div>
 
@@ -343,8 +338,8 @@ const VerifyPass = () => {
           </p>
         )}
 
-        {/* Quick Demo Previews */}
-        <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100 text-[11px] text-slate-500">
+        {/* Quick Test Samples */}
+        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100 text-[11px] text-slate-500">
           <span className="font-semibold text-slate-700">Quick Test Samples:</span>
           <button
             onClick={() => loadDemoPass('OUTPASS')}
@@ -368,38 +363,36 @@ const VerifyPass = () => {
             onClick={() => loadDemoPass('FAKE')}
             className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium rounded-lg transition-colors cursor-pointer border border-rose-200"
           >
-            Unregistered / Fake
+            Unregistered ID
           </button>
         </div>
       </div>
 
-      {/* VERIFICATION RESULT CONTAINER */}
+      {/* VERIFICATION RESULT DISPLAY */}
       {result && (
         <div className="space-y-6">
           {/* STATE 1: VALID & AUTHORIZED PASS */}
           {result.status === 'VALID' && (
             <div className="bg-white border-2 border-emerald-500 rounded-3xl shadow-xl overflow-hidden">
-              {/* Banner Top */}
-              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Green Header Banner */}
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
                     <CheckCircle2 className="h-6 w-6 text-white" />
                   </div>
                   <div>
                     <h2 className="text-base font-bold tracking-tight">PERMIT VALID & AUTHORIZED</h2>
-                    <p className="text-emerald-100 text-xs">Identity verified against RGUT Hostel Master Registry</p>
+                    <p className="text-emerald-100 text-xs">Official institutional permit verified against registry</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 bg-white text-emerald-800 text-xs font-extrabold rounded-full shadow-sm uppercase tracking-wider">
-                    ENTRY / EXIT GRANTED
-                  </span>
-                </div>
+                <span className="px-3 py-1 bg-white text-emerald-800 text-xs font-extrabold rounded-full shadow-sm uppercase tracking-wider">
+                  ENTRY / EXIT GRANTED
+                </span>
               </div>
 
               {/* Pass Content Grid */}
               <div className="p-6 space-y-6">
-                {/* ID & Type Header */}
+                {/* ID & Type Row */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
                   <div className="flex items-center gap-2">
                     <span className="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -414,9 +407,9 @@ const VerifyPass = () => {
                   </span>
                 </div>
 
-                {/* 2-Column Details Grid */}
+                {/* 2-Column Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column: Student / Visitor Profile */}
+                  {/* Column 1: Identity Profile */}
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                       <User className="h-4 w-4 text-indigo-600" /> Identity Credentials
@@ -428,7 +421,7 @@ const VerifyPass = () => {
                         <strong className="text-slate-900">{result.name}</strong>
                       </div>
 
-                      {result.passType.includes('Parent') ? (
+                      {result.passType?.includes('Parent') ? (
                         <>
                           <div className="flex justify-between py-1 border-b border-slate-200/60">
                             <span className="text-slate-500">Relationship:</span>
@@ -474,7 +467,7 @@ const VerifyPass = () => {
                     </div>
                   </div>
 
-                  {/* Right Column: Travel & Authorization Scope */}
+                  {/* Column 2: Travel Window & Scope */}
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                       <Clock className="h-4 w-4 text-emerald-600" /> Travel Window & Authorization
@@ -506,7 +499,7 @@ const VerifyPass = () => {
                   </div>
                 </div>
 
-                {/* AI Security Advisor Callout */}
+                {/* AI Security Callout */}
                 <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 flex items-start gap-3">
                   <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5">
                     <Sparkles className="h-4 w-4" />
@@ -524,7 +517,7 @@ const VerifyPass = () => {
                   </div>
                 </div>
 
-                {/* Gatekeeper Fast Action Buttons */}
+                {/* Fast Action Buttons */}
                 <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100">
                   <div className="flex items-center gap-2">
                     <button
@@ -556,7 +549,7 @@ const VerifyPass = () => {
             </div>
           )}
 
-          {/* STATE 2: EXPIRED OR COMPLETED PASS */}
+          {/* STATE 2: EXPIRED PASS */}
           {result.status === 'EXPIRED' && (
             <div className="bg-white border-2 border-amber-400 rounded-3xl shadow-xl overflow-hidden">
               <div className="bg-amber-500 text-white p-5 flex items-center justify-between">
@@ -597,7 +590,7 @@ const VerifyPass = () => {
             </div>
           )}
 
-          {/* STATE 3: INVALID / FAKE PERMIT */}
+          {/* STATE 3: INVALID / UNVERIFIED PASS */}
           {result.status === 'INVALID' && (
             <div className="bg-white border-2 border-rose-500 rounded-3xl shadow-xl overflow-hidden">
               <div className="bg-rose-600 text-white p-5 flex items-center justify-between">

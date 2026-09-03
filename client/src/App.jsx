@@ -250,6 +250,16 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/verify-pass"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'warden', 'security']}>
+                  <DashboardLayout>
+                    <VerifyPass />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
 
             {/* Fallback */}
             <Route path="*" element={<NotFound />} />
