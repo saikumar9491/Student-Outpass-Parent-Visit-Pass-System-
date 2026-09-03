@@ -433,14 +433,16 @@ const createStudentByAdmin = async (req, res) => {
 
     // Handle automated parent registration
     if (parentName && parentEmail && parentPhone && parentRelationship && parentPassword) {
-      let parentId = '';
-      let parentIdExists = true;
-      while (parentIdExists) {
-        const randNum = Math.floor(100000 + Math.random() * 900000);
-        parentId = `PAR-${randNum}`;
-        const existing = await Parent.findOne({ parentId });
-        if (!existing) {
-          parentIdExists = false;
+      let parentId = req.body.parentId ? req.body.parentId.trim().toUpperCase() : '';
+      if (!parentId) {
+        let parentIdExists = true;
+        while (parentIdExists) {
+          const randNum = Math.floor(100000 + Math.random() * 900000);
+          parentId = `PAR-${randNum}`;
+          const existing = await Parent.findOne({ parentId });
+          if (!existing) {
+            parentIdExists = false;
+          }
         }
       }
 

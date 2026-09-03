@@ -63,10 +63,15 @@ const ManageStudents = () => {
     return `${prefix}${rand}`; // total 8 digits
   };
 
+  const generateParentId = (stuId) => {
+    return `PAR-${stuId || Math.floor(100000 + Math.random() * 900000)}`;
+  };
+
   const openAddModal = () => {
     setIsEditMode(false);
     setEditingStudentId(null);
     const defaultStudentId = generateStudentId(2026);
+    const defaultParentId = generateParentId(defaultStudentId);
     const defaultStudentPassword = String(Math.floor(100000 + Math.random() * 900000));
     const defaultParentPassword = String(Math.floor(100000 + Math.random() * 900000));
     setAdmissionYear(2026);
@@ -80,6 +85,7 @@ const ManageStudents = () => {
       year: '1st Year',
       hostel: '',
       roomNumber: '',
+      parentId: defaultParentId,
       parentName: '',
       parentEmail: '',
       parentPhone: '',
@@ -107,6 +113,7 @@ const ManageStudents = () => {
       year: student.year || '1st Year',
       hostel: student.hostel || '',
       roomNumber: student.roomNumber || '',
+      parentId: linkedParent.parentId || (student.studentId ? generateParentId(student.studentId) : ''),
       parentName: linkedParent.name || '',
       parentEmail: linkedParent.email || '',
       parentPhone: linkedParent.phone || '',
@@ -125,9 +132,11 @@ const ManageStudents = () => {
   const handleAdmissionYearChange = (e) => {
     const yr = Number(e.target.value) || 2026;
     setAdmissionYear(yr);
+    const newStudentId = generateStudentId(yr);
     setFormData(prev => ({
       ...prev,
-      studentId: generateStudentId(yr)
+      studentId: newStudentId,
+      parentId: generateParentId(newStudentId)
     }));
   };
 
@@ -776,7 +785,18 @@ const ManageStudents = () => {
               {/* SECTION 2: Linked Parent / Guardian Details */}
               <div>
                 <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block mb-2">2. Linked Parent / Guardian Information</span>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Generated Parent User ID</label>
+                    <input
+                      type="text"
+                      name="parentId"
+                      readOnly
+                      value={formData.parentId}
+                      className="w-full bg-slate-100 border border-slate-200 text-emerald-600 font-mono font-bold focus:outline-none rounded-xl py-2 px-3 cursor-not-allowed"
+                    />
+                  </div>
+
                   <div>
                     <label className="block mb-1.5 uppercase tracking-wider text-[9px] font-bold text-slate-600">Parent / Guardian Name</label>
                     <input
