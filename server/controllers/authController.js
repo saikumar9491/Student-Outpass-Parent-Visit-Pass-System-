@@ -144,48 +144,63 @@ const registerParent = async (req, res) => {
   }
 };
 
-// @desc    Login student/parent
+// @desc    Login student/parent (Strictly via Assigned Student ID or Parent ID)
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body; // 'email' acts as either Email or Parent ID
+    const { email, password } = req.body; // 'email' holds the assigned Student Roll ID or Parent ID
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Please enter credentials and password' });
+      return res.status(400).json({ message: 'Please enter your assigned ID and password' });
     }
 
     const loginIdentifier = email.trim();
+
+    // Disallow email format for students and parents as requested
+    if (loginIdentifier.includes('@')) {
+      return res.status(400).json({ 
+        message: 'Email login is not permitted for students or parents. Please use your assigned University Roll ID (e.g. 12612345) or Parent ID (e.g. PAR-123456).' 
+      });
+    }
+
     let user = null;
 
     if (loginIdentifier.toUpperCase().startsWith('PAR-')) {
+      // Parent Login via Parent ID
       const parentRecord = await Parent.findOne({ parentId: loginIdentifier.toUpperCase() });
       if (!parentRecord) {
         return res.status(401).json({ message: 'Invalid Parent ID or password' });
       }
       user = await User.findById(parentRecord.userId);
     } else {
-      // Check if it matches a Student Roll ID
+      // Student Login via Student Roll ID
       const studentRecord = await Student.findOne({ studentId: new RegExp(`^${loginIdentifier}$`, 'i') });
-      if (studentRecord) {
-        user = await User.findById(studentRecord.userId);
-      } else {
-        // Fallback to email
-        user = await User.findOne({ email: loginIdentifier.toLowerCase() });
+      if (!studentRecord) {
+        return res.status(401).json({ message: 'Invalid Student Roll ID or password' });
       }
+      user = await User.findById(studentRecord.userId);
     }
 
     if (!user) {
-      return res.status(401).json({ message: 'Invalid user ID, email, or password' });
+      return res.status(401).json({ message: 'User account not found' });
     }
 
     if (user.role === 'admin') {
       return res.status(401).json({ message: 'Admin accounts must use the admin login portal' });
     }
 
+    if (user.status === 'suspended') {
+      return res.status(403).json({ message: 'Your account has been suspended by administration. Please contact the hostel office.' });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid email, Parent ID or password' });
+      return res.status(401).json({ 
+        message: loginIdentifier.toUpperCase().startsWith('PAR-') 
+          ? 'Invalid Parent ID or password' 
+          : 'Invalid Student Roll ID or password' 
+      });
     }
 
     let profileDetails = null;
