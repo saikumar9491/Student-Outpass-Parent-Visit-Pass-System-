@@ -3,102 +3,7 @@ import API from '../../services/api';
 import { toast } from 'react-hot-toast';
 
 const ManageVisitPasses = () => {
-  // Sample Data (6 rows)
-  const initialSampleData = [
-    {
-      _id: 'sample-visit-1',
-      parentName: 'Mrs. Kavitha Sharma',
-      relation: 'Mother',
-      name: 'Arjun Sharma',
-      roll: 'ROLL-1787091234567',
-      hostel: 'Cauvery Boys Hostel',
-      room: '204',
-      date: '28/8/2026',
-      timings: '10:00 am – 01:00 pm',
-      purpose: 'Family visit',
-      visitors: '3 visitors',
-      visitorCount: 3,
-      status: 'PENDING'
-    },
-    {
-      _id: 'sample-visit-2',
-      parentName: 'Mr. Ramesh Patel',
-      relation: 'Father',
-      name: 'Priya Patel',
-      roll: 'ROLL-1787055678901',
-      hostel: 'Ganga Girls Hostel',
-      room: '312',
-      date: '27/8/2026',
-      timings: '02:00 pm – 05:00 pm',
-      purpose: 'Document handover',
-      visitors: '1 visitor',
-      visitorCount: 1,
-      status: 'APPROVED'
-    },
-    {
-      _id: 'sample-visit-3',
-      parentName: 'Mrs. Sunita Mehta',
-      relation: 'Mother',
-      name: 'Rohan Mehta',
-      roll: 'ROLL-1787078901234',
-      hostel: 'Kaveri Boys Hostel',
-      room: '115',
-      date: '26/8/2026',
-      timings: '11:00 am – 03:00 pm',
-      purpose: 'Medical emergency',
-      visitors: '2 visitors',
-      visitorCount: 2,
-      status: 'APPROVED'
-    },
-    {
-      _id: 'sample-visit-4',
-      parentName: 'Mr. Vijay Reddy',
-      relation: 'Father',
-      name: 'Sneha Reddy',
-      roll: 'ROLL-1787066543210',
-      hostel: 'Ganga Girls Hostel',
-      room: '201',
-      date: '25/8/2026',
-      timings: '09:00 am – 12:00 pm',
-      purpose: 'Fee payment',
-      visitors: '1 visitor',
-      visitorCount: 1,
-      status: 'REJECTED'
-    },
-    {
-      _id: 'sample-visit-5',
-      parentName: 'Mrs. Anita Verma',
-      relation: 'Guardian',
-      name: 'Test Student',
-      roll: 'ROLL-1787034181517',
-      hostel: 'Kaveri Boys Hostel',
-      room: '101',
-      date: '24/8/2026',
-      timings: '03:00 pm – 06:00 pm',
-      purpose: 'Personal visit',
-      visitors: '2 visitors',
-      visitorCount: 2,
-      status: 'EXPIRED'
-    },
-    {
-      _id: 'sample-visit-6',
-      parentName: 'Mr. Suresh Kumar',
-      relation: 'Father',
-      name: 'Test Student',
-      roll: 'ROLL-1787033275235',
-      hostel: 'Kaveri Boys Hostel',
-      room: '101',
-      date: '23/8/2026',
-      timings: '10:00 am – 01:00 pm',
-      purpose: 'Birthday celebration',
-      visitors: '4 visitors',
-      visitorCount: 4,
-      status: 'CANCELLED'
-    }
-  ];
-
   const [dbVisits, setDbVisits] = useState([]);
-  const [localVisits, setLocalVisits] = useState(initialSampleData);
   const [selectedPass, setSelectedPass] = useState(null);
   const [activeTab, setActiveTab] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -111,7 +16,7 @@ const ManageVisitPasses = () => {
   const fetchDbVisits = async () => {
     try {
       const res = await API.get('/admin/visit-passes');
-      const mapped = res.data.map(v => ({
+      const mapped = (res.data || []).map(v => ({
         _id: v._id,
         parentName: v.parentId?.name || v.visitorName || 'Parent',
         relation: v.relationship || 'Parent',
@@ -129,7 +34,7 @@ const ManageVisitPasses = () => {
       setDbVisits(mapped);
     } catch (error) {
       console.error('Error fetching database visits:', error);
-      toast.error('Failed to load live database entries. Using local cache.');
+      toast.error('Failed to load visit passes from database');
     } finally {
       setLoading(false);
     }
@@ -139,18 +44,7 @@ const ManageVisitPasses = () => {
     fetchDbVisits();
   }, []);
 
-  // Merge database and local mock data, discarding mock rows if live records exist for the same student roll
-  const activeRolls = new Set(dbVisits.map(v => v.roll.trim().toUpperCase()));
-  const filteredLocal = localVisits.filter(lv => !activeRolls.has(lv.roll.trim().toUpperCase()));
-  const mergedList = [...dbVisits, ...filteredLocal];
-
-  // Additional safety deduplication by Roll and timings (normalizing spaces and cases)
-  const uniqueList = mergedList.filter((item, index, self) => 
-    index === self.findIndex((t) => 
-      t.roll.trim().toUpperCase() === item.roll.trim().toUpperCase() && 
-      t.timings.replace(/\s+/g, '').toUpperCase() === item.timings.replace(/\s+/g, '').toUpperCase()
-    )
-  );
+  const uniqueList = dbVisits;
 
   // Filter based on status tab and search queries
   const filteredVisits = uniqueList.filter(pass => {

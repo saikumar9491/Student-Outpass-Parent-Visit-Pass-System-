@@ -3,84 +3,7 @@ import API from '../../services/api';
 import { toast } from 'react-hot-toast';
 
 const ManageOutpasses = () => {
-  // Sample Data (6 rows)
-  const initialSampleData = [
-    {
-      _id: 'sample-1',
-      name: 'Test Student',
-      roll: 'ROLL-1787034181517',
-      hostel: 'Kaveri Boys Hostel',
-      room: '101',
-      date: '19/8/2026',
-      timings: '11:53 am – 04:53 pm',
-      destination: 'City Market',
-      purpose: 'Buying groceries',
-      status: 'EXPIRED'
-    },
-    {
-      _id: 'sample-2',
-      name: 'Test Student',
-      roll: 'ROLL-1787033275235',
-      hostel: 'Kaveri Boys Hostel',
-      room: '101',
-      date: '19/8/2026',
-      timings: '11:37 am – 04:37 pm',
-      destination: 'City Market',
-      purpose: 'Buying groceries',
-      status: 'EXPIRED'
-    },
-    {
-      _id: 'sample-3',
-      name: 'Arjun Sharma',
-      roll: 'ROLL-1787091234567',
-      hostel: 'Cauvery Boys Hostel',
-      room: '204',
-      date: '27/8/2026',
-      timings: '09:00 am – 01:00 pm',
-      destination: 'Railway Station',
-      purpose: 'Picking up family',
-      status: 'PENDING'
-    },
-    {
-      _id: 'sample-4',
-      name: 'Priya Patel',
-      roll: 'ROLL-1787055678901',
-      hostel: 'Ganga Girls Hostel',
-      room: '312',
-      date: '26/8/2026',
-      timings: '02:00 pm – 06:00 pm',
-      destination: 'City Hospital',
-      purpose: 'Medical checkup',
-      status: 'APPROVED'
-    },
-    {
-      _id: 'sample-5',
-      name: 'Rohan Mehta',
-      roll: 'ROLL-1787078901234',
-      hostel: 'Kaveri Boys Hostel',
-      room: '115',
-      date: '25/8/2026',
-      timings: '10:00 am – 05:00 pm',
-      destination: 'Home',
-      purpose: 'Family function',
-      status: 'REJECTED'
-    },
-    {
-      _id: 'sample-6',
-      name: 'Sneha Reddy',
-      roll: 'ROLL-1787066543210',
-      hostel: 'Ganga Girls Hostel',
-      room: '201',
-      date: '24/8/2026',
-      timings: '03:00 pm – 08:00 pm',
-      destination: 'Shopping Mall',
-      purpose: 'Personal work',
-      status: 'CANCELLED'
-    }
-  ];
-
   const [dbOutpasses, setDbOutpasses] = useState([]);
-  const [localOutpasses, setLocalOutpasses] = useState(initialSampleData);
   const [selectedPass, setSelectedPass] = useState(null);
   const [activeTab, setActiveTab] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,7 +16,7 @@ const ManageOutpasses = () => {
   const fetchDbOutpasses = async () => {
     try {
       const res = await API.get('/admin/outpasses');
-      const mapped = res.data.map(o => ({
+      const mapped = (res.data || []).map(o => ({
         _id: o._id,
         name: o.studentId?.name || 'Student',
         roll: o.studentId?.studentId || 'N/A',
@@ -108,7 +31,7 @@ const ManageOutpasses = () => {
       setDbOutpasses(mapped);
     } catch (error) {
       console.error('Error fetching database outpasses:', error);
-      toast.error('Failed to load live database entries. Using local cache.');
+      toast.error('Failed to load outpasses from database');
     } finally {
       setLoading(false);
     }
@@ -118,15 +41,7 @@ const ManageOutpasses = () => {
     fetchDbOutpasses();
   }, []);
 
-  // Merge database outpasses and local sample outpasses, discarding mock rows if live records exist for the same student roll
-  const activeRolls = new Set(dbOutpasses.map(p => p.roll.trim().toUpperCase()));
-  const filteredLocal = localOutpasses.filter(lp => !activeRolls.has(lp.roll.trim().toUpperCase()));
-  const mergedList = [...dbOutpasses, ...filteredLocal];
-
-  // Additional safety deduplication by Roll and timings
-  const uniqueList = mergedList.filter((item, index, self) => 
-    index === self.findIndex((t) => t.roll.trim().toUpperCase() === item.roll.trim().toUpperCase() && t.timings === item.timings)
-  );
+  const uniqueList = dbOutpasses;
 
   // Filter lists based on tab status and search query
   const filteredOutpasses = uniqueList.filter(pass => {

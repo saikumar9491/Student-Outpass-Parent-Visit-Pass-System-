@@ -3,124 +3,7 @@ import API from '../../services/api';
 import { toast } from 'react-hot-toast';
 
 const ActivePasses = () => {
-  // Sample Data (7 rows)
-  const initialSampleData = [
-    {
-      _id: 'sample-act-1',
-      type: 'OUTPASS',
-      name: 'Arjun Sharma',
-      secondaryInfo: 'ROLL-1787091234567',
-      roll: 'ROLL-1787091234567',
-      hostel: 'Cauvery Boys Hostel',
-      room: '204',
-      date: '27/8/2026',
-      timings: '09:00 am – 01:00 pm',
-      destination: 'Railway Station',
-      purpose: 'Picking up family',
-      visitorCount: 0,
-      relation: '',
-      status: 'APPROVED' // active
-    },
-    {
-      _id: 'sample-act-2',
-      type: 'VISIT',
-      name: 'Mrs. Kavitha Sharma',
-      secondaryInfo: 'Visiting: Arjun Sharma',
-      roll: 'ROLL-1787091234567',
-      hostel: 'Cauvery Boys Hostel',
-      room: '204',
-      date: '27/8/2026',
-      timings: '10:00 am – 01:00 pm',
-      destination: 'Family visit',
-      purpose: 'Family visit',
-      visitorCount: 3,
-      relation: 'Mother',
-      status: 'APPROVED' // active
-    },
-    {
-      _id: 'sample-act-3',
-      type: 'OUTPASS',
-      name: 'Priya Patel',
-      secondaryInfo: 'ROLL-1787055678901',
-      roll: 'ROLL-1787055678901',
-      hostel: 'Ganga Girls Hostel',
-      room: '312',
-      date: '27/8/2026',
-      timings: '11:00 am – 03:00 pm',
-      destination: 'City Hospital',
-      purpose: 'Medical checkup',
-      visitorCount: 0,
-      relation: '',
-      status: 'APPROVED' // active
-    },
-    {
-      _id: 'sample-act-4',
-      type: 'VISIT',
-      name: 'Mr. Ramesh Patel',
-      secondaryInfo: 'Visiting: Priya Patel',
-      roll: 'ROLL-1787055678901',
-      hostel: 'Ganga Girls Hostel',
-      room: '312',
-      date: '27/8/2026',
-      timings: '02:00 pm – 05:00 pm',
-      destination: 'Document handover',
-      purpose: 'Document handover',
-      visitorCount: 1,
-      relation: 'Father',
-      status: 'APPROVED' // active
-    },
-    {
-      _id: 'sample-act-5',
-      type: 'OUTPASS',
-      name: 'Rohan Mehta',
-      secondaryInfo: 'ROLL-1787078901234',
-      roll: 'ROLL-1787078901234',
-      hostel: 'Kaveri Boys Hostel',
-      room: '115',
-      date: '27/8/2026',
-      timings: '08:00 am – 11:00 am',
-      destination: 'City Market',
-      purpose: 'Buying supplies',
-      visitorCount: 0,
-      relation: '',
-      status: 'APPROVED' // active
-    },
-    {
-      _id: 'sample-act-6',
-      type: 'OUTPASS',
-      name: 'Sneha Reddy',
-      secondaryInfo: 'ROLL-1787066543210',
-      roll: 'ROLL-1787066543210',
-      hostel: 'Ganga Girls Hostel',
-      room: '201',
-      date: '27/8/2026',
-      timings: '10:00 am – 12:00 pm',
-      destination: 'Library',
-      purpose: 'Project research',
-      visitorCount: 0,
-      relation: '',
-      status: 'APPROVED' // active
-    },
-    {
-      _id: 'sample-act-7',
-      type: 'VISIT',
-      name: 'Mrs. Sunita Mehta',
-      secondaryInfo: 'Visiting: Rohan Mehta',
-      roll: 'ROLL-1787078901234',
-      hostel: 'Kaveri Boys Hostel',
-      room: '115',
-      date: '27/8/2026',
-      timings: '09:00 am – 11:30 am',
-      destination: 'Medical emergency',
-      purpose: 'Medical emergency',
-      visitorCount: 2,
-      relation: 'Mother',
-      status: 'APPROVED' // active
-    }
-  ];
-
   const [dbPasses, setDbPasses] = useState([]);
-  const [localPasses, setLocalPasses] = useState(initialSampleData);
   const [selectedPass, setSelectedPass] = useState(null);
   const [activeToggle, setActiveToggle] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,7 +21,7 @@ const ActivePasses = () => {
         API.get('/admin/visit-passes?status=APPROVED')
       ]);
 
-      const mappedOutpasses = outpassesRes.data.map(o => ({
+      const mappedOutpasses = (outpassesRes.data || []).map(o => ({
         _id: o._id,
         type: 'OUTPASS',
         name: o.studentId?.name || 'Student',
@@ -156,7 +39,7 @@ const ActivePasses = () => {
         status: o.status
       }));
 
-      const mappedVisits = visitsRes.data.map(v => ({
+      const mappedVisits = (visitsRes.data || []).map(v => ({
         _id: v._id,
         type: 'VISIT',
         name: v.parentId?.name || v.visitorName || 'Parent',
@@ -166,7 +49,6 @@ const ActivePasses = () => {
         room: v.studentId?.roomNumber || 'N/A',
         date: new Date(v.visitDate).toLocaleDateString(),
         timings: `${v.arrivalTime} – ${v.departureTime}`,
-        // Format departureTime as ISO style if it is mock
         destination: v.purpose,
         purpose: v.purpose,
         visitorCount: v.visitorCount || 1,
@@ -177,7 +59,7 @@ const ActivePasses = () => {
       setDbPasses([...mappedOutpasses, ...mappedVisits]);
     } catch (error) {
       console.error('Error fetching active passes:', error);
-      toast.error('Failed to load live database entries. Using local cache.');
+      toast.error('Failed to load active passes from database');
     } finally {
       setLoading(false);
     }
@@ -195,10 +77,10 @@ const ActivePasses = () => {
 
   // Sync AI monitor scan automatically on mount
   useEffect(() => {
-    if (!loading) {
+    if (!loading && dbPasses.length > 0) {
       fetchAiMonitor();
     }
-  }, [loading]);
+  }, [loading, dbPasses]);
 
   // Helper to parse return date for checking overdue and countdown
   const getPassEndDate = (pass) => {
@@ -250,15 +132,8 @@ const ActivePasses = () => {
     }
   };
 
-  // Merge database and local mock data, discarding mock rows if roll matches live data
-  const activeRolls = new Set(dbPasses.map(p => p.roll.trim().toUpperCase()));
-  const filteredLocal = localPasses.filter(lp => !activeRolls.has(lp.roll.trim().toUpperCase()));
-  const mergedList = [...dbPasses, ...filteredLocal];
-
-  // Remove exact duplicates
-  const uniqueList = mergedList.filter((item, index, self) => 
-    index === self.findIndex((t) => t.roll.trim().toUpperCase() === item.roll.trim().toUpperCase() && t.timings === item.timings)
-  );
+  // Use database data
+  const uniqueList = dbPasses;
 
   // Map countdown info to each pass
   const passesWithCountdown = uniqueList.map(pass => {
